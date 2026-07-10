@@ -476,7 +476,7 @@ function renderGeoChart(w, el, canvasId, rawLabels, rawValues, chartInstances, f
         projection:{
           axis:"x",
           projection: scope==="europe" ? "mercator" : "equalEarth",
-          projectionScale: scope==="europe" ? 1.35 : 1.15,
+          projectionScale: scope==="europe" ? 2.1 : 1.55,
           projectionOffset:[0,0]
         }
       }
