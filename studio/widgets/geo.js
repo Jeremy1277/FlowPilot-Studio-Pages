@@ -473,7 +473,12 @@ function renderGeoChart(w, el, canvasId, rawLabels, rawValues, chartInstances, f
         }
       },
       scales:{
-        projection:{ axis:"x", projection: scope==="europe" ? "mercator" : "equalEarth" }
+        projection:{
+          axis:"x",
+          projection: scope==="europe" ? "mercator" : "equalEarth",
+          projectionScale: scope==="europe" ? 1.35 : 1.15,
+          projectionOffset:[0,0]
+        }
       }
     }
   });
