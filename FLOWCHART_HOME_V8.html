@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlowChart — Suite Applicative 3PL</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Barlow+Condensed:wght@300;400;500;600;700&family=Syne:wght@800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+.header-brand .flow{color:#fff}
+.header-brand .chart{color:#EF9F27}
+:root{
+  --fa:#00D4FF;--ff:#85BC25;--fo:#FFE000;--fp:#FF6B35;--fs:#FF2D7B;
+  --card-bg:#0E0E0E;--border:rgba(255,255,255,0.08);
+}
+html,body{width:100%;height:100%}
+body{
+  background:linear-gradient(160deg,#090909 0%,#111111 50%,#0C0C0C 100%);
+  color:#fff;font-family:'Barlow Condensed',sans-serif;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  overflow:hidden;position:relative;min-height:100vh;
+}
+.watermark{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  font-family:'Orbitron',sans-serif;font-weight:900;
+  font-size:clamp(60px,12vw,150px);
+  color:transparent;-webkit-text-stroke:1px rgba(255,255,255,0.05);
+  letter-spacing:0.12em;white-space:nowrap;
+  pointer-events:none;user-select:none;z-index:1;
+}
+.header{
+  position:relative;z-index:10;text-align:center;
+  margin-bottom:clamp(18px,3vh,38px);
+  animation:fadeDown 0.8s ease both;
+}
+.header-eyebrow{font-size:11px;letter-spacing:0.4em;color:rgba(255,255,255,0.2);text-transform:uppercase;margin-bottom:8px}
+.header-brand{font-family:'Syne',sans-serif;font-size:clamp(52px,9vw,110px);font-weight:800;letter-spacing:-3px;line-height:0.9;color:#fff}
+.header-brand span{color:rgba(255,255,255,0.3)}
+.header-sub{margin-top:8px;font-size:12px;letter-spacing:0.25em;color:rgba(255,255,255,0.18);font-weight:300}
+
+.carousel-wrapper{
+  position:relative;z-index:10;
+  display:flex;align-items:center;gap:clamp(12px,2vw,28px);
+  padding:0 20px;animation:fadeUp 0.8s 0.2s ease both;
+}
+.nav-btn{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);
+  color:rgba(255,255,255,0.45);
+  width:clamp(42px,4vw,52px);height:clamp(42px,4vw,52px);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all 0.22s;flex-shrink:0;font-size:18px;
+}
+.nav-btn:hover{background:rgba(255,255,255,0.09);color:#fff;border-color:rgba(255,255,255,0.28);transform:scale(1.06)}
+.nav-btn:active{transform:scale(0.96)}
+
+/* Carte principale — plus grande */
+.card-area{
+  width:clamp(360px,44vw,580px);
+  height:clamp(460px,56vh,580px);
+  position:relative;overflow:hidden;
+}
+.card{
+  position:absolute;inset:0;
+  background:var(--card-bg);border:1px solid var(--border);
+  border-radius:24px;
+  padding:clamp(36px,5vh,56px) clamp(32px,4vw,52px) clamp(32px,4vh,48px);
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  opacity:0;transform:translateX(80px) scale(0.97);
+  transition:opacity 0.35s ease,transform 0.35s ease;
+  pointer-events:none;overflow:hidden;
+}
+.card.active{opacity:1;transform:translateX(0) scale(1);pointer-events:all}
+.card.exit-left{opacity:0;transform:translateX(-80px) scale(0.97);transition:opacity 0.25s ease,transform 0.25s ease}
+
+.card-accent{
+  position:absolute;top:0;left:50px;right:50px;height:2px;
+  border-radius:0 0 2px 2px;opacity:0.65;
+}
+.app-logo{
+  width:clamp(130px,15vw,160px);height:clamp(130px,15vw,160px);
+  border-radius:24px;background:#000;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',sans-serif;font-weight:900;
+  font-size:clamp(34px,4.5vw,46px);letter-spacing:4px;
+  margin-bottom:clamp(22px,3.5vh,32px);
+  border:1px solid rgba(255,255,255,0.06);flex-shrink:0;
+}
+.app-name{
+  font-family:'Orbitron',sans-serif;font-size:clamp(14px,1.8vw,20px);
+  font-weight:700;letter-spacing:0.25em;color:rgba(255,255,255,0.92);margin-bottom:12px;
+}
+.app-tag{
+  font-size:10px;letter-spacing:0.2em;padding:3px 14px;
+  border-radius:100px;font-weight:600;text-transform:uppercase;
+  margin-bottom:clamp(14px,2vh,22px);border:1px solid;
+}
+.app-desc{
+  font-size:clamp(13px,1.4vw,15px);
+  font-weight:400;
+  color:rgba(255,255,255,1);   /* opacité 100% */
+  line-height:1.65;letter-spacing:0.03em;
+  flex:1;max-width:360px;
+}
+.launch-btn{
+  margin-top:clamp(18px,3vh,28px);
+  display:inline-flex;align-items:center;gap:8px;
+  padding:clamp(10px,1.3vh,14px) clamp(26px,3vw,38px);
+  border-radius:8px;
+  font-family:'Barlow Condensed',sans-serif;
+  font-size:13px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;
+  text-decoration:none;cursor:pointer;border:none;transition:all 0.2s;
+}
+.launch-btn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.launch-btn:active{transform:translateY(0)}
+.launch-btn.disabled{
+  background:rgba(255,255,255,0.05)!important;
+  color:rgba(255,255,255,0.22)!important;
+  cursor:default;pointer-events:none;
+}
+
+.dots{
+  display:flex;gap:8px;margin-top:clamp(16px,2.5vh,26px);
+  position:relative;z-index:10;animation:fadeUp 0.8s 0.35s ease both;
+}
+.dot{height:5px;border-radius:3px;background:rgba(255,255,255,0.15);cursor:pointer;transition:all 0.35s ease;width:5px}
+.dot.active{width:22px}
+
+.footer{position:fixed;bottom:18px;font-size:10px;letter-spacing:0.25em;color:rgba(255,255,255,0.1);text-transform:uppercase;z-index:10}
+.key-hint{position:fixed;bottom:38px;font-size:10px;letter-spacing:0.2em;color:rgba(255,255,255,0.08);text-transform:uppercase;z-index:10;display:flex;align-items:center;gap:6px}
+.key-hint kbd{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:4px;padding:1px 6px;font-family:inherit;font-size:10px}
+
+@keyframes fadeDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<div class="watermark">FLOW CHART</div>
+
+<header class="header">
+  <div class="header-brand"><span class="flow">FLOW</span><span class="chart">CHART</span></div>
+  <div class="header-sub">Suite applicative Transport &amp; Flux</div>
+</header>
+
+<div class="carousel-wrapper">
+  <button class="nav-btn" id="prevBtn" aria-label="Précédent">&#8592;</button>
+  <div class="card-area" id="cardArea"></div>
+  <button class="nav-btn" id="nextBtn" aria-label="Suivant">&#8594;</button>
+</div>
+
+<div class="dots" id="dots"></div>
+<div class="key-hint"><kbd>&#8592;</kbd>&nbsp;<kbd>&#8594;</kbd>&nbsp;Naviguer</div>
+<footer class="footer">Topo 3PL · Lorang · ArcelorMittal Belval</footer>
+
+<script>
+const apps = [
+  {
+    initials:'FA', name:'FLOW ANALYSE',
+    tag:'Reporting', color:'#00D4FF', rgb:'0,212,255',
+    url:'https://nice-meadow-099185710.7.azurestaticapps.net', live:true
+  },
+  {
+    initials:'FF', name:'FLOW FLEET',    
+    tag:'Flotte', color:'#85BC25', rgb:'133,188,37',
+    url:'https://ambitious-wave-0b4c99410.7.azurestaticapps.net', live:true
+  },
+  {
+    initials:'FO', name:'FLOW ORDER',    
+    tag:'Commandes', color:'#FFE000', rgb:'255,224,0',
+    url:'https://victorious-island-0571ffc03.7.azurestaticapps.net', live:true
+  },
+  {
+    initials:'FB', name:'FLOW BOARD',    
+    tag:'Pilotage', color:'#FF6B35', rgb:'255,107,53',
+    url:'https://jolly-beach-0aa8f2d10.7.azurestaticapps.net', live:true
+  },
+  {
+    initials:'FS', name:'FLOW STUDIO',
+    tag:'En développement', color:'#FF2D7B', rgb:'255,45,123',
+    url:null, live:false
+  }
+];
+
+const cardArea = document.getElementById('cardArea');
+const dotsEl   = document.getElementById('dots');
+let current = 0, animating = false;
+
+apps.forEach((app, i) => {
+  const card = document.createElement('div');
+  card.className = 'card' + (i === 0 ? ' active' : '');
+
+  const btnHtml = (app.live && app.url)
+    ? `<a href="${app.url}" class="launch-btn" target="_blank"
+         style="background:${app.color};color:#000">Ouvrir l'app &rarr;</a>`
+    : `<span class="launch-btn disabled">En développement</span>`;
+
+  card.innerHTML = `
+    <div class="card-accent" style="background:linear-gradient(90deg,transparent,${app.color},transparent)"></div>
+    <div class="app-logo" style="box-shadow:0 0 44px rgba(${app.rgb},0.2)">
+      <span style="color:${app.color}">${app.initials}</span>
+    </div>
+    <div class="app-name">${app.name}</div>
+    <div class="app-tag" style="color:${app.color};border-color:rgba(${app.rgb},0.3);background:rgba(${app.rgb},0.1)">${app.tag}</div>
+    ${btnHtml}
+  `;
+  cardArea.appendChild(card);
+
+  const dot = document.createElement('div');
+  dot.className = 'dot' + (i === 0 ? ' active' : '');
+  if (i === 0) dot.style.background = apps[0].color;
+  dot.onclick = () => goTo(i);
+  dotsEl.appendChild(dot);
+});
+
+const cards = cardArea.querySelectorAll('.card');
+const dots  = dotsEl.querySelectorAll('.dot');
+
+function goTo(n, rev) {
+  if (animating || n === current) return;
+  animating = true;
+  const prev = current;
+  current = ((n % apps.length) + apps.length) % apps.length;
+  cards[prev].classList.add('exit-left');
+  cards[prev].classList.remove('active');
+  cards[current].style.transform = rev ? 'translateX(-80px) scale(0.97)' : 'translateX(80px) scale(0.97)';
+  cards[current].style.opacity = '0';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    cards[current].style.transform = '';
+    cards[current].style.opacity = '';
+    cards[current].classList.add('active');
+    setTimeout(() => { cards[prev].classList.remove('exit-left'); animating = false; }, 380);
+  }));
+  dots.forEach((d, i) => {
+    d.className = 'dot' + (i === current ? ' active' : '');
+    d.style.background = i === current ? apps[i].color : 'rgba(255,255,255,0.15)';
+  });
+}
+
+document.getElementById('nextBtn').onclick = () => goTo(current + 1, false);
+document.getElementById('prevBtn').onclick = () => goTo(current - 1, true);
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') goTo(current + 1, false);
+  if (e.key === 'ArrowLeft')  goTo(current - 1, true);
+});
+
+let touchX = 0;
+cardArea.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; });
+cardArea.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchX;
+  if (Math.abs(dx) > 50) dx < 0 ? goTo(current + 1, false) : goTo(current - 1, true);
+});
+
+dots[0].style.background = apps[0].color;
+</script>
+</body>
+</html>

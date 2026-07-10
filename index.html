@@ -1,0 +1,129 @@
+<!--
+================================================================================
+  FlowPilot Studio — Coming Soon
+================================================================================
+  Copyright (c) 2026 Jeremy Ducrot. Tous droits réservés.
+  Développé avec Anthropic (Claude) et OpenAI (ChatGPT)
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FlowPilot Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@900&family=DM+Sans:wght@700&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    background: #08111f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 700px;
+    background: radial-gradient(ellipse, rgba(239,159,39,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .center {
+    text-align: center;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .logo {
+    width: 270px;
+    height: 270px;
+    border-radius: 54px;
+    background: #EF9F27;
+    color: #0d1b2a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 126px;
+    letter-spacing: -0.03em;
+    box-shadow: 0 0 80px rgba(239,159,39,0.4), 0 12px 48px rgba(0,0,0,0.5);
+    margin-bottom: 90px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    border: 2px solid #EF9F27;
+    border-radius: 6px;
+    padding: 10px 24px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 22px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #EF9F27;
+    animation: neon-flicker 3s infinite;
+    box-shadow:
+      0 0 8px rgba(239,159,39,0.6),
+      0 0 20px rgba(239,159,39,0.3),
+      inset 0 0 10px rgba(239,159,39,0.05);
+  }
+
+  .badge-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #EF9F27;
+    box-shadow: 0 0 10px rgba(239,159,39,1);
+    animation: dot-pulse 3s infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes neon-flicker {
+    0%   { opacity: 1; }
+    4%   { opacity: 0.4; }
+    6%   { opacity: 1; }
+    8%   { opacity: 0.4; }
+    10%  { opacity: 1; }
+    50%  { opacity: 1; }
+    52%  { opacity: 0.5; }
+    54%  { opacity: 1; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes dot-pulse {
+    0%   { opacity: 1; }
+    4%   { opacity: 0.2; }
+    6%   { opacity: 1; }
+    8%   { opacity: 0.2; }
+    10%  { opacity: 1; }
+    50%  { opacity: 1; }
+    52%  { opacity: 0.2; }
+    54%  { opacity: 1; }
+    100% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+  <div class="center">
+    <div class="logo">FP</div>
+    <div class="badge">
+      <div class="badge-dot"></div>
+      Coming in a future release
+    </div>
+  </div>
+</body>
+</html>
