@@ -326,6 +326,25 @@ const EUROPE_A2 = new Set(["AD","AL","AT","BA","BE","BG","BY","CH","CY","CZ","DE
   "LI","LT","LU","LV","MC","MD","ME","MK","MT","NL","NO","PL","PT","RO","RS","SE",
   "SI","SK","SM","UA","VA"]);
 
+// Noms d'affichage en français (Europe) pour les labels sur la carte
+const A2_TO_FR = {
+  AD:"Andorre", AL:"Albanie", AT:"Autriche", BA:"Bosnie-Herzégovine", BE:"Belgique",
+  BG:"Bulgarie", BY:"Biélorussie", CH:"Suisse", CY:"Chypre", CZ:"Tchéquie",
+  DE:"Allemagne", DK:"Danemark", EE:"Estonie", ES:"Espagne", FI:"Finlande",
+  FO:"Îles Féroé", FR:"France", GB:"Royaume-Uni", GG:"Guernesey", GI:"Gibraltar",
+  GR:"Grèce", HR:"Croatie", HU:"Hongrie", IE:"Irlande", IM:"Île de Man",
+  IS:"Islande", IT:"Italie", JE:"Jersey", LI:"Liechtenstein", LT:"Lituanie",
+  LU:"Luxembourg", LV:"Lettonie", MC:"Monaco", MD:"Moldavie", ME:"Monténégro",
+  MK:"Macédoine du Nord", MT:"Malte", NL:"Pays-Bas", NO:"Norvège", PL:"Pologne",
+  PT:"Portugal", RO:"Roumanie", RS:"Serbie", SE:"Suède", SI:"Slovénie",
+  SK:"Slovaquie", SM:"Saint-Marin", UA:"Ukraine", VA:"Vatican",
+  RU:"Russie", TR:"Turquie", US:"États-Unis", CN:"Chine", JP:"Japon",
+  IN:"Inde", BR:"Brésil", CA:"Canada", MX:"Mexique", MA:"Maroc", DZ:"Algérie",
+  TN:"Tunisie", EG:"Égypte", ZA:"Afrique du Sud",
+};
+function displayCountryName(a2, feature){
+  return A2_TO_FR[a2] || (feature&&feature.properties&&feature.properties.name) || a2 || "";
+}
 
 function stripAccents(s){
   return String(s).normalize("NFD").replace(/[\u0300-\u036f]/g,"");
@@ -381,7 +400,7 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
   }
 
   el.innerHTML='<div class="geo-wrap" style="display:flex;flex-direction:column;height:100%;gap:4px">'
-    +'<div class="chart-wrap" style="flex:1;min-height:110px;position:relative"><canvas id="'+canvasId+'"></canvas></div>'
+    +'<div class="chart-wrap" style="flex:1;min-height:110px;position:relative;overflow:hidden"><canvas id="'+canvasId+'" style="transform:scale(1.3);transform-origin:center center"></canvas></div>'
     +'<div class="geo-legend" id="'+canvasId+'-legend" style="display:flex;align-items:center;gap:6px;font-size:9px;color:var(--muted,#8ca0b3);padding:0 4px"></div>'
     +'<div class="geo-warn" id="'+canvasId+'-warn" style="font-size:9px;color:#D85A30;padding:0 4px;display:none"></div>'
     +'</div>';
@@ -440,8 +459,53 @@ function renderGeoChart(w, el, canvasId, rawLabels, rawValues, chartInstances, f
 
   if(chartInstances[canvasId]){ try{ chartInstances[canvasId].destroy(); }catch(e){} }
 
+  // Plugin: dessine le nom du pays + sa valeur au centre de chaque pays coloré
+  const geoLabelPlugin={
+    id:"geoLabels",
+    afterDatasetsDraw:function(chart){
+      const pScale=chart.scales&&chart.scales.projection;
+      if(!pScale||!pScale.geoPath) return;
+      const ctx=chart.ctx;
+      const ds=chart.data.datasets[0];
+      if(!ds||!ds.data) return;
+      ctx.save();
+      ctx.textAlign="center";
+      ctx.textBaseline="middle";
+      ds.data.forEach(function(dp){
+        if(dp.value==null||!dp.feature) return;
+        const bounds=pScale.geoPath.bounds(dp.feature);
+        const bw=bounds[1][0]-bounds[0][0], bh=bounds[1][1]-bounds[0][1];
+        // Pays trop petit à l'écran : on saute le label pour éviter le fouillis
+        if(!isFinite(bw)||!isFinite(bh)||bw<26||bh<18) return;
+        const c=pScale.geoPath.centroid(dp.feature);
+        if(!c||!isFinite(c[0])||!isFinite(c[1])) return;
+        const a2=NUM_TO_A2[String(dp.feature.id)];
+        const name=displayCountryName(a2,dp.feature);
+        const valTxt=fmtNum(dp.value);
+        const nameSize=Math.max(9,Math.min(14,bw/8));
+        const valSize=nameSize+2;
+
+        ctx.font="700 "+nameSize+"px 'DM Sans',Arial,sans-serif";
+        ctx.lineWidth=3;
+        ctx.strokeStyle="rgba(255,255,255,.88)";
+        ctx.fillStyle="#132A3A";
+        ctx.strokeText(name,c[0],c[1]-valSize*0.55);
+        ctx.fillText(name,c[0],c[1]-valSize*0.55);
+
+        ctx.font="800 "+valSize+"px 'DM Sans',Arial,sans-serif";
+        ctx.lineWidth=3.2;
+        ctx.strokeStyle="rgba(255,255,255,.92)";
+        ctx.fillStyle="#0D1B2A";
+        ctx.strokeText(valTxt,c[0],c[1]+nameSize*0.55);
+        ctx.fillText(valTxt,c[0],c[1]+nameSize*0.55);
+      });
+      ctx.restore();
+    }
+  };
+
   chartInstances[canvasId]=new Chart(canvas.getContext("2d"),{
     type:"choropleth",
+    plugins:[geoLabelPlugin],
     data:{
       labels:chartLabels,
       datasets:[{
@@ -465,7 +529,8 @@ function renderGeoChart(w, el, canvasId, rawLabels, rawValues, chartInstances, f
           callbacks:{
             label:function(ctx){
               const v=ctx.raw&&ctx.raw.value;
-              const nm=(ctx.raw&&ctx.raw.feature&&ctx.raw.feature.properties&&ctx.raw.feature.properties.name)||"";
+              const a2f=ctx.raw&&ctx.raw.feature?NUM_TO_A2[String(ctx.raw.feature.id)]:null;
+              const nm=displayCountryName(a2f,ctx.raw&&ctx.raw.feature);
               if(v==null) return nm+" — pas de donnée";
               return nm+": "+fmtNum(v);
             }
@@ -476,7 +541,7 @@ function renderGeoChart(w, el, canvasId, rawLabels, rawValues, chartInstances, f
         projection:{
           axis:"x",
           projection: scope==="europe" ? "mercator" : "equalEarth",
-          projectionScale: scope==="europe" ? 2.1 : 1.55,
+          projectionScale: scope==="europe" ? 1.5 : 1.25,
           projectionOffset:[0,0]
         }
       }
