@@ -488,6 +488,12 @@ function ensureSpan(b,minX,minY){
   if(y1-y0<minY){ const c=(y0+y1)/2; y0=c-minY/2; y1=c+minY/2; }
   return [x0,y0,x1,y1];
 }
+// Fenêtres de cadrage forcé (w.geoScope) : [lonMin,latMin,lonMax,latMax]
+const SCOPE_WINDOWS={france:[-5.5,41.2,9.9,51.3],europe:[-25,34,35,72],world:[-179.9,-56,179.9,84]};
+function windowMerc(win){
+  return [projX(win[0]),projY(win[3]),projX(win[2]),projY(win[1])];
+}
+
 function fitTransform(b,w,h,pad){
   const dx=b[2]-b[0]||1e-9, dy=b[3]-b[1]||1e-9;
   const s=Math.min((w-pad*2)/dx,(h-pad*2)/dy);
@@ -707,7 +713,7 @@ function prepCountry(w,features,rawLabels,rawValues){
 
   let scope=w.geoScope||"auto";
   if(scope==="auto") scope=matched.every(function(a2){return EUROPE_A2.has(a2);})?"europe":"world";
-  const featureSet=scope==="europe"
+  const featureSet=(scope==="europe"||scope==="france")
     ? features.filter(function(f){ const a2=NUM_TO_A2[String(f.id)]; return a2&&EUROPE_A2.has(a2); })
     : features.filter(function(f){ return NUM_TO_A2[String(f.id)]!=="AQ"; });
 
@@ -721,7 +727,7 @@ function prepCountry(w,features,rawLabels,rawValues){
   if(!entries.length) return {error:"Aucun pays affichable dans cette colonne"};
 
   return {kind:"choro",features:featureSet,entries:entries,
-    clip:scope==="europe"?[-25,34,35,72]:[-179.9,-56,179.9,84],unmatched:unmatched};
+    clip:(scope==="europe"||scope==="france")?[-25,34,35,72]:[-179.9,-56,179.9,84],unmatched:unmatched};
 }
 
 function prepDept(w,features,rawLabels,rawValues){
@@ -821,7 +827,7 @@ function fpgeoInjectCSS(){
     ".fpgeo-lbl-name{font-family:'DM Sans',Arial,sans-serif;font-weight:700;fill:#132A3A;paint-order:stroke;stroke:rgba(255,255,255,.88);stroke-width:3px;stroke-linejoin:round}",
     ".fpgeo-lbl-val{font-family:'Barlow Condensed','DM Sans',Arial,sans-serif;font-weight:800;fill:#0D1B2A;paint-order:stroke;stroke:rgba(255,255,255,.92);stroke-width:3.4px;stroke-linejoin:round;letter-spacing:.02em}",
     ".fpgeo-ptlbl-name{font-family:'DM Sans',Arial,sans-serif;font-weight:700;font-size:10px;fill:#132A3A;paint-order:stroke;stroke:rgba(255,255,255,.9);stroke-width:3px;stroke-linejoin:round;pointer-events:none}",
-    ".fpgeo-ptlbl-val{font-family:'Barlow Condensed','DM Sans',Arial,sans-serif;font-weight:800;fill:#fff;paint-order:stroke;stroke:rgba(13,27,42,.45);stroke-width:2.6px;stroke-linejoin:round;pointer-events:none}",
+    ".fpgeo-ptlbl-val{font-family:'Barlow Condensed','DM Sans',Arial,sans-serif;font-weight:800;fill:#fff;pointer-events:none}",
     '.fpgeo-ctrls{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;opacity:0;transition:opacity .25s ease;z-index:3}',
     '.fpgeo-stage:hover .fpgeo-ctrls{opacity:1}',
     '.fpgeo-btn{width:26px;height:26px;border-radius:8px;border:1px solid rgba(13,27,42,.08);background:rgba(255,255,255,.92);backdrop-filter:blur(4px);color:#31465c;font-size:14px;font-weight:700;line-height:1;display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(13,27,42,.10);transition:background .15s,transform .12s;padding:0}',
@@ -899,9 +905,9 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
   } else if(mode==="city"){
     Promise.all([loadPlaces(),loadWorldFeatures()]).then(function(res){
       const prep=prepCity(w,res[0],res[1].filter(function(f){return NUM_TO_A2[String(f.id)]!=="AQ";}),rawLabels,rawValues);
-      if(prep.allFR){
-        // fond détaillé France (départements) quand toutes les villes sont françaises
-        loadDeptFeatures().then(function(df){ prep.features=df; start(prep); })
+      if(prep.allFR||w.geoScope==="france"){
+        // fond détaillé France (départements) : villes toutes françaises, ou zone France forcée
+        loadDeptFeatures().then(function(df){ prep.features=df; prep.clip=null; start(prep); })
           .catch(function(){ start(prep); });
       } else start(prep);
     }).catch(fail);
@@ -933,13 +939,19 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   const scheme=geoColorScheme(w);
   function tOf(v){ return vmax>vmin?(v-vmin)/(vmax-vmin):0.7; }
 
-  // ---- cadrage : zoom auto sur la zone des données -----------------------
+  // ---- cadrage : fenêtre forcée (w.geoScope) ou zoom auto sur les données --
   const fullB=mercBounds(geo.features,geo.clip);
-  let dataB=isChoro
-    ? mercBounds(items.map(function(e){return e.feature;}),geo.clip)
-    : pointMercBounds(items);
-  dataB=expandBounds(dataB,isChoro?0.14:0.22);
-  dataB=ensureSpan(dataB,(fullB[2]-fullB[0])*0.16,(fullB[3]-fullB[1])*0.16);
+  const forcedWin=SCOPE_WINDOWS[w.geoScope];
+  let dataB;
+  if(forcedWin){
+    dataB=windowMerc(forcedWin);
+  } else {
+    dataB=isChoro
+      ? mercBounds(items.map(function(e){return e.feature;}),geo.clip)
+      : pointMercBounds(items);
+    dataB=expandBounds(dataB,isChoro?0.14:0.22);
+    dataB=ensureSpan(dataB,(fullB[2]-fullB[0])*0.16,(fullB[3]-fullB[1])*0.16);
+  }
   const fit=fitTransform(dataB,W,H,8);
   const fitAll=fitTransform(expandBounds(fullB,0.03),W,H,8);
 
@@ -1004,10 +1016,12 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       const r=B.r*ks;
       B.g.setAttribute("transform","translate("+(B.x*z.k+z.tx)+" "+(B.y*z.k+z.ty)+")");
       B.circle.setAttribute("r",r.toFixed(1));
-      const showVal=labelsOn&&r>=11;
-      const showName=labelsOn&&(B.rank<=8||r>=11);
+      const fs=Math.max(9,Math.min(13,r*0.75));
+      const fits=B.valLen*fs*0.56<=r*2.1;
+      const showVal=labelsOn&&r>=11&&fits;
+      const showName=labelsOn&&(B.rank<=6||r>=13);
       B.tVal.style.opacity=showVal?1:0;
-      B.tVal.setAttribute("font-size",Math.max(9,Math.min(13,r*0.75)).toFixed(1));
+      B.tVal.setAttribute("font-size",fs.toFixed(1));
       B.tName.style.opacity=showName?1:0;
       B.tName.setAttribute("y",(r+11).toFixed(1));
     }
@@ -1119,7 +1133,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
     ptsSorted.forEach(function(pt,i){
       const t=tOf(pt.value);
       const r=items.length===1?rMax*0.75:rMin+(rMax-rMin)*Math.sqrt(Math.max(0,t));
-      const fill=scheme.fill(t);
+      const fill=scheme.fill(0.35+t*0.65); // plancher relevé : les petites bulles restent visibles
       const g=document.createElementNS(NS,"g");
       g.setAttribute("class","fpgeo-ptg");
       const bub=document.createElementNS(NS,"g");
@@ -1143,7 +1157,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       tn.textContent=pt.name;
       g.appendChild(tv); g.appendChild(tn);
       gPts.appendChild(g);
-      const B={g:g,circle:c,tName:tn,tVal:tv,
+      const B={g:g,circle:c,tName:tn,tVal:tv,valLen:fmtNum(pt.value).length,
         x:projX(pt.lon)*fit.s+fit.tx, y:projY(pt.lat)*fit.s+fit.ty,
         r:r, rank:i+1, pt:pt, fill:fill};
       bubbles.push(B);
