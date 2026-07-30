@@ -958,6 +958,13 @@ body.fp-dark .step-btn.active{background:var(--accent);color:#0d1b2a}
 body.fp-dark .toast{background:#1a2534;color:var(--dark);border:1px solid var(--border)}
 body.fp-dark .aggr-btn.selected,body.fp-dark .ct-btn.selected{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 body.fp-dark .wp-btn,body.fp-dark .demo-btn{box-shadow:0 2px 6px rgba(0,0,0,.3)}
+body.fp-dark .wc-btn{background:#26374e;border-color:#3a4f6a;color:#cdd9e7}
+body.fp-dark .wc-btn:hover{border-color:var(--accent);color:var(--accent);background:#2c3f58}
+body.fp-dark .wc-btn.edit-btn{background:var(--accent-soft);border-color:rgba(239,159,39,.45);color:var(--accent)}
+body.fp-dark .wc-btn.edit-btn:hover{background:var(--accent);color:#0d1b2a}
+body.fp-dark .wc-btn.del:hover{border-color:var(--coral);color:var(--coral)}
+body.fp-dark .wc-btn.zoom-btn:hover{border-color:var(--green);color:var(--green)}
+body.fp-dark .wc-drag,body.fp-dark .wc-handle{color:#5f7690}
 
 /* ══════════ COQUES SUPPLÉMENTAIRES (base sombre = classe fp-dark en plus) ══════════ */
 /* ⚡ Fluo — néon électrique sur noir */
@@ -8118,7 +8125,7 @@ widgets.forEach((w,wi)=>{
   }
 
   // Initialisation douce après chargement du script.
-  setTimeout(()=>{ensureGlobalFilterBar(); buildFilterBar(); updateGlobalFilterVisibility();},0);
+  setTimeout(()=>{ensureGlobalFilterBar(); buildFilterBar(); updateGlobalFilterVisibility(); injectPeriodCSS();},0);
   window.FlowPilotPatchVersion=PATCH_VERSION;
 
   // ── PÉRIODE RAPIDE ────────────────────────────────────────────────────
@@ -8128,7 +8135,7 @@ widgets.forEach((w,wi)=>{
     if(document.getElementById('fp-period-css')) return;
     const s=document.createElement('style');
     s.id='fp-period-css';
-    s.textContent='.fp-gf-period-btn{border:1.5px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;color:#fff;cursor:pointer;white-space:nowrap}.fp-gf-period-btn:hover{background:rgba(255,255,255,.2)}.fp-gf-period-badge{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:7px;padding:3px 8px;font-size:11px;font-weight:700}';
+    s.textContent='.fp-gf-period-btn{border:1px solid var(--border);background:var(--card2);border-radius:9px;padding:6px 11px;font-size:11px;font-weight:700;font-family:DM Sans,sans-serif;color:var(--dark);cursor:pointer;white-space:nowrap;transition:all .15s}.fp-gf-period-btn:hover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}.fp-gf-period-badge{display:flex;align-items:center;gap:4px;background:var(--accent-soft);border:1px solid var(--accent);color:var(--dark);border-radius:9px;padding:4px 9px;font-size:11px;font-weight:700}.fp-gf-period-badge button{color:var(--mid)!important}';
     document.head.appendChild(s);
   }
 
