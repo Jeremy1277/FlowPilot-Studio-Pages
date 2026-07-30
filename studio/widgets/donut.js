@@ -499,10 +499,10 @@ export function renderDonutPanel(w) {
       + '</div>';
   }
   function swatch(name, val, lbl, cur, colors) {
-    const dots = colors.slice(0,4).map(c => '<span style="width:9px;height:9px;border-radius:50%;background:' + c + ';display:inline-block;margin-left:-3px;border:1px solid rgba(255,255,255,.6)"></span>').join('');
-    return '<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 8px;border:1px solid ' + (cur===val?'#EF9F27':'#e2e8f0') + ';border-radius:8px;background:' + (cur===val?'#fff7ec':'#fff') + '">'
+    const grad = 'linear-gradient(90deg,' + colors.slice(0,5).join(',') + ')';
+    return '<label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:5px 9px;border:1px solid ' + (cur===val?'#EF9F27':'#e2e8f0') + ';border-radius:9px;background:' + (cur===val?'#fff7ec':'linear-gradient(180deg,#ffffff,#f6f9fc)') + ';box-shadow:0 1px 3px rgba(13,27,42,.08)">'
       + '<input type="radio" name="' + name + '" value="' + val + '" ' + (cur===val?'checked':'') + ' style="accent-color:#EF9F27"/>'
-      + '<span style="display:flex;align-items:center;padding-left:3px">' + dots + '</span>'
+      + '<span class="fp-chip" style="width:36px;height:16px;background:' + grad + ';display:inline-block"></span>'
       + lbl + '</label>';
   }
 

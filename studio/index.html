@@ -5170,9 +5170,8 @@ function openTuning(wid){
     const curPal   = w.geoPalette || 'ambre';
     const PALS = window.FP_GEO_PALETTES || {};
     const palChip = (id,label,grad) =>
-      '<button type="button" class="tn-geo-pal'+(curPal===id?' sel':'')+'" data-pal="'+id+'" title="'+label+'" '
-      +'style="width:52px;height:24px;border-radius:7px;cursor:pointer;background:'+grad+';'
-      +'border:2px solid '+(curPal===id?'var(--accent)':'transparent')+';box-shadow:inset 0 0 0 1px rgba(13,27,42,.12)"></button>';
+      '<button type="button" class="tn-geo-pal fp-chip'+(curPal===id?' sel':'')+'" data-pal="'+id+'" title="'+label+'" '
+      +'style="width:52px;height:24px;background:'+grad+'"></button>';
     const geoHtml =
       '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Jeu de couleurs</div>'
       +'<div id="tn-geo-pals" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
@@ -5182,6 +5181,18 @@ function openTuning(wid){
       +'<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">'
       +'<span style="font-size:11px;color:var(--muted)">Couleur perso</span>'
       +'<input type="color" id="tn-geo-color" value="'+(w.color||'#4a7fa5')+'" style="width:28px;height:28px;border:none;padding:0;cursor:pointer;border-radius:6px"/>'
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Format des valeurs</div>'
+      +'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
+      +'<select id="tn-geo-format" style="flex:1;min-width:140px;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;font-family:inherit">'
+      + [['auto','Automatique court'],['integer','Entier'],['decimal','Décimal'],['currency','Monétaire'],['percent','Pourcentage'],['compact','Compact k/M']].map(([v,l]) =>
+          '<option value="'+v+'"'+((w.valueFormat||'auto')===v?' selected':'')+'>'+l+'</option>'
+        ).join('')
+      +'</select>'
+      +'<input id="tn-geo-decimals" type="number" min="0" max="6" step="1" title="Décimales" placeholder="Déc." value="'+(Number.isFinite(parseInt(w.valueDecimals,10))?parseInt(w.valueDecimals,10):'')+'" style="width:52px;font-size:12px;padding:6px 6px;border:1px solid var(--border);border-radius:8px;font-family:inherit"/>'
+      +'<select id="tn-geo-currency" title="Devise" style="width:78px;font-size:12px;padding:6px 6px;border:1px solid var(--border);border-radius:8px;background:#fff;font-family:inherit">'
+      + ['EUR','USD','GBP','CHF'].map(c => '<option value="'+c+'"'+((w.valueCurrency||'EUR')===c?' selected':'')+'>'+c+'</option>').join('')
+      +'</select>'
       +'</div>'
       +'<div style="display:flex;flex-direction:column;gap:6px">'
       + [['auto','Auto (détecte Europe ou Monde)'],['europe','Europe'],['world','Monde']].map(([v,l]) =>
@@ -5195,8 +5206,8 @@ function openTuning(wid){
     if(palWrap){
       palWrap.addEventListener('click', function(e){
         const b = e.target.closest('.tn-geo-pal'); if(!b) return;
-        palWrap.querySelectorAll('.tn-geo-pal').forEach(x=>{ x.classList.remove('sel'); x.style.borderColor='transparent'; });
-        b.classList.add('sel'); b.style.borderColor='var(--accent)';
+        palWrap.querySelectorAll('.tn-geo-pal').forEach(x=>x.classList.remove('sel'));
+        b.classList.add('sel');
       });
       const persoInput = document.getElementById('tn-geo-color');
       if(persoInput) persoInput.addEventListener('input', function(){
@@ -5349,11 +5360,12 @@ function openTuning(wid){
   if(swatchZone){
     COLORS.forEach(function(c){
       const btn = document.createElement('button');
-      btn.style.cssText = 'width:20px;height:20px;border-radius:5px;border:2px solid '+(c===color?'var(--navy)':'transparent')+';background:'+c+';cursor:pointer;padding:0';
+      btn.className = 'fp-chip'+(c===color?' sel':'');
+      btn.style.cssText = 'width:24px;height:24px;background:'+c;
       btn.addEventListener('click', function(){
         document.getElementById('tn-color').value = c;
-        swatchZone.querySelectorAll('button').forEach(b => b.style.borderColor = 'transparent');
-        this.style.borderColor = 'var(--navy)';
+        swatchZone.querySelectorAll('button').forEach(b => b.classList.remove('sel'));
+        this.classList.add('sel');
       });
       swatchZone.appendChild(btn);
     });
@@ -5402,6 +5414,12 @@ function applyTuning(){
     widgets[idx].geoScope  = document.querySelector('input[name="tn-geo-scope"]:checked')?.value || widgets[idx].geoScope || 'auto';
     const selPal = document.querySelector('#tn-geo-pals .tn-geo-pal.sel');
     if(selPal) widgets[idx].geoPalette = selPal.dataset.pal;
+    const gFmt = get('tn-geo-format');
+    if(gFmt) widgets[idx].valueFormat = gFmt.value;
+    const gDec = get('tn-geo-decimals');
+    if(gDec) widgets[idx].valueDecimals = gDec.value==='' ? null : Math.max(0,Math.min(6,parseInt(gDec.value,10)||0));
+    const gCur = get('tn-geo-currency');
+    if(gCur) widgets[idx].valueCurrency = gCur.value;
   }
 
   closeTuning();
@@ -6375,6 +6393,13 @@ function fpRenderGeoApp(w, elId, rawLabels, rawValues, chartInstances, fmtNum, c
 
   if(chartInstances[canvasId]){ try{ chartInstances[canvasId].destroy(); }catch(e){} delete chartInstances[canvasId]; }
 
+  // Formateur lié au widget : la carte rend en asynchrone (après chargement du
+  // fond de carte), donc on fige ici le format du widget (valueFormat, décimales,
+  // devise…) au lieu de dépendre de l'état global au moment du dessin.
+  const fmtW=(typeof window!=="undefined"&&typeof window.fpFormatNumber==="function")
+    ? function(v){ return window.fpFormatNumber(v,w); }
+    : fmtNum;
+
   el.innerHTML='<div class="geo-wrap" style="display:flex;flex-direction:column;height:100%;gap:4px">'
     +'<div class="fpgeo-stage" id="'+canvasId+'-stage"><div class="fpgeo-load">Chargement de la carte…</div></div>'
     +'<div class="geo-legend" id="'+canvasId+'-legend" style="display:flex;align-items:center;gap:6px;font-size:9px;color:var(--muted,#8ca0b3);padding:0 4px"></div>'
@@ -6382,7 +6407,7 @@ function fpRenderGeoApp(w, elId, rawLabels, rawValues, chartInstances, fmtNum, c
     +'</div>';
 
   geoLoadFeatures().then(function(features){
-    buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fmtNum, features, 0, false);
+    buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fmtW, features, 0, false);
   }).catch(function(){
     el.innerHTML='<div class="wc-empty"><div class="we-icon">⚠️</div><div>Impossible de charger le fond de carte</div></div>';
   });
@@ -6759,7 +6784,7 @@ var __geoInstances={};
 function renderGeoWidget(w,el,wi,labels,values,color){
   if(!el.id) el.id='wb'+wi;
   var w2=Object.assign({},w); if(!w2.color) w2.color=color;
-  fpRenderGeoApp(w2, el.id, labels, values, __geoInstances, fmt, 'geo'+wi);
+  fpRenderGeoApp(w2, el.id, labels, values, __geoInstances, function(v){return fmt(v,w2);}, 'geo'+wi);
 }
 // ── GEO-EXPORT-END
 

@@ -586,6 +586,13 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
 
   if(chartInstances[canvasId]){ try{ chartInstances[canvasId].destroy(); }catch(e){} delete chartInstances[canvasId]; }
 
+  // Formateur lié au widget : la carte rend en asynchrone (après chargement du
+  // fond de carte), donc on fige ici le format du widget (valueFormat, décimales,
+  // devise…) au lieu de dépendre de l'état global au moment du dessin.
+  const fmtW=(typeof window!=="undefined"&&typeof window.fpFormatNumber==="function")
+    ? function(v){ return window.fpFormatNumber(v,w); }
+    : fmtNum;
+
   el.innerHTML='<div class="geo-wrap" style="display:flex;flex-direction:column;height:100%;gap:4px">'
     +'<div class="fpgeo-stage" id="'+canvasId+'-stage"><div class="fpgeo-load">Chargement de la carte…</div></div>'
     +'<div class="geo-legend" id="'+canvasId+'-legend" style="display:flex;align-items:center;gap:6px;font-size:9px;color:var(--muted,#8ca0b3);padding:0 4px"></div>'
@@ -593,7 +600,7 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
     +'</div>';
 
   loadWorldFeatures().then(function(features){
-    buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fmtNum, features, 0, false);
+    buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fmtW, features, 0, false);
   }).catch(function(){
     el.innerHTML='<div class="wc-empty"><div class="we-icon">⚠️</div><div>Impossible de charger le fond de carte</div></div>';
   });

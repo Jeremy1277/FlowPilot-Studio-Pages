@@ -805,3 +805,12 @@ th{padding:7px 10px;background:var(--navy);color:rgba(255,255,255,.7);text-align
 td{padding:7px 10px;border-bottom:1px solid #eef2f7;color:var(--dark)}
 tr:nth-child(even) td{background:#f8fafc}
 .table-wrap{overflow:auto;max-height:min(680px,calc(100vh - 260px));border:1px solid var(--border);border-radius:10px}
+
+/* ── Pastilles « glacées » partagées (tuning : carte, couleurs, palettes) ── */
+.fp-chip{position:relative;border-radius:7px;cursor:pointer;border:2px solid transparent;padding:0;overflow:hidden;
+  box-shadow:inset 0 0 0 1px rgba(13,27,42,.12),0 1px 3px rgba(13,27,42,.15);
+  transition:transform .12s ease,box-shadow .15s ease,border-color .12s ease}
+.fp-chip::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.14) 42%,rgba(255,255,255,0) 62%)}
+.fp-chip:hover{transform:translateY(-1px);box-shadow:inset 0 0 0 1px rgba(13,27,42,.12),0 3px 8px rgba(13,27,42,.22)}
+.fp-chip.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px rgba(13,27,42,.08),0 2px 7px rgba(239,159,39,.4)}
