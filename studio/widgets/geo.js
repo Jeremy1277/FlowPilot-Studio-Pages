@@ -488,8 +488,22 @@ function ensureSpan(b,minX,minY){
   if(y1-y0<minY){ const c=(y0+y1)/2; y0=c-minY/2; y1=c+minY/2; }
   return [x0,y0,x1,y1];
 }
-// Fenêtres de cadrage forcé (w.geoScope) : [lonMin,latMin,lonMax,latMax]
-const SCOPE_WINDOWS={france:[-5.5,41.2,9.9,51.3],europe:[-25,34,35,72],world:[-179.9,-56,179.9,84]};
+// Fenêtres de cadrage (w.geoScope) : [lonMin,latMin,lonMax,latMax]
+const SCOPE_WINDOWS={europe:[-25,34,35,72],world:[-179.9,-56,179.9,84]};
+const COUNTRY_WINDOWS={
+  FR:[-5.5,41.2,9.9,51.3], BE:[2.4,49.4,6.6,51.7], CH:[5.8,45.7,10.7,47.9],
+  DE:[5.7,47.1,15.2,55.2], ES:[-9.5,35.8,4.5,44.0], IT:[6.5,36.4,18.7,47.3],
+  NL:[3.1,50.6,7.4,53.7], PT:[-9.7,36.8,-6.0,42.3], PL:[14.0,48.9,24.3,55.1],
+  AT:[9.4,46.2,17.3,49.2], LU:[5.6,49.3,6.7,50.3], GB:[-8.3,49.8,1.9,58.9],
+  IE:[-10.6,51.3,-5.8,55.5], DK:[7.9,54.4,13.0,57.9], NO:[4.4,57.8,31.3,71.3],
+  SE:[10.9,55.2,24.3,69.2], FI:[20.4,59.6,31.7,70.2], CZ:[11.9,48.4,19.0,51.2],
+  HU:[16.0,45.6,23.0,48.7], SI:[13.2,45.3,16.7,47.0],
+};
+function normScope(scope){ return scope==="france"?"FR":(scope||"auto"); }
+function scopeWindowFor(scope){
+  scope=normScope(scope);
+  return SCOPE_WINDOWS[scope]||COUNTRY_WINDOWS[scope]||null;
+}
 function windowMerc(win){
   return [projX(win[0]),projY(win[3]),projX(win[2]),projY(win[1])];
 }
@@ -694,6 +708,46 @@ function loadPostcodes(){
   return _pcPromise;
 }
 
+// Découpages administratifs internes (régions / Länder / provinces… — NUTS Eurostat)
+let _regionsPromise=null;
+function loadRegions(){
+  if(_regionsPromise) return _regionsPromise;
+  _regionsPromise=fetchJsonWithFallback("widgets/geo-regions.json")
+    .catch(function(e){ _regionsPromise=null; throw e; });
+  return _regionsPromise;
+}
+
+function worldContext(world,excludeCC){
+  return world.filter(function(f){
+    const a2=NUM_TO_A2[String(f.id)];
+    return a2!=="AQ"&&(!excludeCC||a2!==excludeCC);
+  });
+}
+
+// Attache le fond du pays « focus » : ses régions internes en base + le reste du monde en contexte
+function withFocusBg(prep, focusCC, world){
+  if(!focusCC){
+    prep.context=worldContext(world,null);
+    prep.base=prep.base||[];
+    prep.baseCls=prep.baseCls||"fpgeo-region";
+    return Promise.resolve(prep);
+  }
+  const bgP=focusCC==="FR"
+    ? loadDeptFeatures()
+    : loadRegions().then(function(R){
+        const fc=R.countries&&R.countries[focusCC];
+        if(!fc) throw 0;
+        return fc.features;
+      });
+  return bgP.then(function(fs){
+    prep.base=fs; prep.baseCls="fpgeo-region"; prep.context=worldContext(world,focusCC);
+    return prep;
+  }).catch(function(){
+    prep.base=[]; prep.baseCls="fpgeo-region"; prep.context=worldContext(world,null);
+    return prep;
+  });
+}
+
 /* ── Préparation des scènes ───────────────────────────────────────────── */
 
 function aggInto(byKey,key,label,value){
@@ -711,9 +765,10 @@ function prepCountry(w,features,rawLabels,rawValues){
   const matched=Object.keys(byA2);
   if(!matched.length) return {error:"Aucun pays reconnu dans cette colonne"};
 
-  let scope=w.geoScope||"auto";
+  let scope=normScope(w.geoScope);
   if(scope==="auto") scope=matched.every(function(a2){return EUROPE_A2.has(a2);})?"europe":"world";
-  const featureSet=(scope==="europe"||scope==="france")
+  else if(scope!=="world"&&scope!=="europe") scope=COUNTRY_WINDOWS[scope]?"europe":"world"; // zone pays -> contexte Europe
+  const featureSet=scope==="europe"
     ? features.filter(function(f){ const a2=NUM_TO_A2[String(f.id)]; return a2&&EUROPE_A2.has(a2); })
     : features.filter(function(f){ return NUM_TO_A2[String(f.id)]!=="AQ"; });
 
@@ -726,8 +781,8 @@ function prepCountry(w,features,rawLabels,rawValues){
   matched.forEach(function(a2){ if(!seen[a2]) unmatched.push(byA2[a2].label+" (non affichable)"); });
   if(!entries.length) return {error:"Aucun pays affichable dans cette colonne"};
 
-  return {kind:"choro",features:featureSet,entries:entries,
-    clip:(scope==="europe"||scope==="france")?[-25,34,35,72]:[-179.9,-56,179.9,84],unmatched:unmatched};
+  return {kind:"choro",base:featureSet,baseCls:"fpgeo-land",context:[],entries:entries,
+    clip:scope==="europe"?[-25,34,35,72]:[-179.9,-56,179.9,84],unmatched:unmatched};
 }
 
 function prepDept(w,features,rawLabels,rawValues){
@@ -748,10 +803,10 @@ function prepDept(w,features,rawLabels,rawValues){
   Object.keys(byKey).forEach(function(k){ if(!seen[k]) unmatched.push(byKey[k].label+" (hors métropole)"); });
   if(!entries.length) return {error:"Aucun département métropolitain reconnu"};
 
-  return {kind:"choro",features:features,entries:entries,clip:null,unmatched:unmatched};
+  return {kind:"choro",base:features,baseCls:"fpgeo-region",context:[],entries:entries,clip:null,unmatched:unmatched};
 }
 
-function prepCpZones(w,cc,pcData,features,rawLabels,rawValues){
+function prepCpZones(w,cc,pcData,rawLabels,rawValues){
   const C=pcData.countries&&pcData.countries[cc];
   if(!C) return {error:"Codes postaux « "+cc+" » non couverts"};
   const byKey={}; const unmatched=[];
@@ -776,10 +831,10 @@ function prepCpZones(w,cc,pcData,features,rawLabels,rawValues){
     const z=C.zones[k];
     return {key:k,name:"Zone "+k,lat:z[0],lon:z[1],value:byKey[k].value};
   });
-  return {kind:"points",features:features,points:points,clip:[-179.9,-56,179.9,84],unmatched:unmatched};
+  return {kind:"points",points:points,clip:null,unmatched:unmatched};
 }
 
-function prepCity(w,places,features,rawLabels,rawValues){
+function prepCity(w,places,rawLabels,rawValues){
   const byKey={}; const meta={}; const unmatched=[];
   rawLabels.forEach(function(lbl,i){
     if(lbl==null||String(lbl).trim()==="") return;
@@ -796,9 +851,9 @@ function prepCity(w,places,features,rawLabels,rawValues){
   const points=keys.map(function(k){
     return {key:k,name:meta[k].name,lat:meta[k].lat,lon:meta[k].lon,value:byKey[k].value};
   });
-  const allFR=points.every(function(p){ return meta[p.key].cc==="FR"; });
-  return {kind:"points",features:features,points:points,allFR:allFR,
-    clip:allFR?null:[-179.9,-56,179.9,84],unmatched:unmatched};
+  let cc=null;
+  if(keys.length&&keys.every(function(k){ return meta[k].cc===meta[keys[0]].cc; })) cc=meta[keys[0]].cc;
+  return {kind:"points",points:points,cc:cc,clip:null,unmatched:unmatched};
 }
 
 /* ── CSS injecté ──────────────────────────────────────────────────────── */
@@ -809,11 +864,14 @@ function fpgeoInjectCSS(){
   st.id="fpgeo-style";
   st.textContent=[
     '.fpgeo-stage{position:relative;flex:1;min-height:110px;overflow:hidden;border-radius:12px;cursor:grab;',
-    ' background:radial-gradient(130% 100% at 28% 8%,#ffffff 0%,rgba(255,255,255,0) 52%),linear-gradient(160deg,#f5f9fd 0%,#e9eff7 58%,#e2eaf4 100%);',
-    ' box-shadow:inset 0 0 0 1px rgba(13,27,42,.05)}',
+    ' background:radial-gradient(130% 100% at 28% 8%,rgba(255,255,255,.75) 0%,rgba(255,255,255,0) 52%),linear-gradient(160deg,#e8f1fa 0%,#d3e1f0 58%,#c6d7ea 100%);',
+    ' box-shadow:inset 0 0 0 1px rgba(13,27,42,.07)}',
     '.fpgeo-stage.fpgeo-drag{cursor:grabbing}',
     '.fpgeo-svg{position:absolute;inset:0;width:100%;height:100%;display:block}',
-    '.fpgeo-land{fill:#e4eaf2;stroke:#fff;stroke-width:.7;vector-effect:non-scaling-stroke}',
+    '.fpgeo-land{fill:#b9c7d9;stroke:#f4f8fc;stroke-width:.8;vector-effect:non-scaling-stroke;transition:fill .15s ease}',
+    '.fpgeo-land:hover{fill:#aebfd4}',
+    '.fpgeo-region{fill:#e9eff7;stroke:#9fb2c9;stroke-width:.6;vector-effect:non-scaling-stroke;transition:fill .15s ease}',
+    '.fpgeo-region:hover{fill:#dde7f2}',
     '.fpgeo-c{stroke:#fff;stroke-width:1;vector-effect:non-scaling-stroke;cursor:pointer;transition:filter .18s ease,opacity .5s ease}',
     '.fpgeo-data.fpgeo-hovering .fpgeo-c:not(.fpgeo-hover){opacity:.72}',
     '.fpgeo-c.fpgeo-hover{filter:brightness(1.1) saturate(1.08);stroke-width:1.8}',
@@ -891,25 +949,28 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
   }
 
   const mode=classifyGeoLabels(rawLabels);
+  const scopeCC=COUNTRY_WINDOWS[normScope(w.geoScope)]?normScope(w.geoScope):null;
   if(mode==="cp"){
     const cc=detectCpCountry(rawLabels, w.geoCpCountry);
     if(cc==="FR"){
-      loadDeptFeatures().then(function(features){
-        start(prepDept(w,features,rawLabels,rawValues));
+      Promise.all([loadDeptFeatures(),loadWorldFeatures()]).then(function(res){
+        const prep=prepDept(w,res[0],rawLabels,rawValues);
+        if(!prep.error) prep.context=worldContext(res[1],"FR");
+        start(prep);
       }).catch(fail);
     } else {
       Promise.all([loadPostcodes(),loadWorldFeatures()]).then(function(res){
-        start(prepCpZones(w,cc,res[0],res[1].filter(function(f){return NUM_TO_A2[String(f.id)]!=="AQ";}),rawLabels,rawValues));
+        const prep=prepCpZones(w,cc,res[0],rawLabels,rawValues);
+        if(prep.error) return start(prep);
+        withFocusBg(prep,scopeCC||cc,res[1]).then(start);
       }).catch(fail);
     }
   } else if(mode==="city"){
     Promise.all([loadPlaces(),loadWorldFeatures()]).then(function(res){
-      const prep=prepCity(w,res[0],res[1].filter(function(f){return NUM_TO_A2[String(f.id)]!=="AQ";}),rawLabels,rawValues);
-      if(prep.allFR||w.geoScope==="france"){
-        // fond détaillé France (départements) : villes toutes françaises, ou zone France forcée
-        loadDeptFeatures().then(function(df){ prep.features=df; prep.clip=null; start(prep); })
-          .catch(function(){ start(prep); });
-      } else start(prep);
+      const prep=prepCity(w,res[0],rawLabels,rawValues);
+      if(prep.error) return start(prep);
+      // fond détaillé (départements / régions) du pays affiché : zone forcée ou pays unique des données
+      withFocusBg(prep,scopeCC||prep.cc,res[1]).then(start);
     }).catch(fail);
   } else {
     loadWorldFeatures().then(function(features){
@@ -940,8 +1001,12 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   function tOf(v){ return vmax>vmin?(v-vmin)/(vmax-vmin):0.7; }
 
   // ---- cadrage : fenêtre forcée (w.geoScope) ou zoom auto sur les données --
-  const fullB=mercBounds(geo.features,geo.clip);
-  const forcedWin=SCOPE_WINDOWS[w.geoScope];
+  const baseFs=geo.base||[], ctxFs=geo.context||[];
+  const allBg=ctxFs.length?ctxFs.concat(baseFs):baseFs;
+  const fullB=mercBounds(allBg,geo.clip);
+  // référence pour l'intro et les tailles mini : le pays/la zone de base si présent, sinon tout
+  const refB=baseFs.length?mercBounds(baseFs,geo.clip):fullB;
+  const forcedWin=scopeWindowFor(w.geoScope);
   let dataB;
   if(forcedWin){
     dataB=windowMerc(forcedWin);
@@ -950,10 +1015,10 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       ? mercBounds(items.map(function(e){return e.feature;}),geo.clip)
       : pointMercBounds(items);
     dataB=expandBounds(dataB,isChoro?0.14:0.22);
-    dataB=ensureSpan(dataB,(fullB[2]-fullB[0])*0.16,(fullB[3]-fullB[1])*0.16);
+    dataB=ensureSpan(dataB,(refB[2]-refB[0])*0.16,(refB[3]-refB[1])*0.16);
   }
   const fit=fitTransform(dataB,W,H,8);
-  const fitAll=fitTransform(expandBounds(fullB,0.03),W,H,8);
+  const fitAll=fitTransform(expandBounds(refB,0.05),W,H,8);
 
   // ---- construction du SVG ----------------------------------------------
   const NS="http://www.w3.org/2000/svg";
@@ -1058,10 +1123,20 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
     p.addEventListener("pointerleave",function(){ tip.classList.remove("fpgeo-tip-on"); });
   }
 
-  // ---- fond + couches de données -----------------------------------------
+  // ---- fond (contexte monde + découpage du pays) + couches de données ----
   const entryByFeature=isChoro?new Map(geo.entries.map(function(e){return [e.feature,e];})):null;
   const dataShapes=[];
-  geo.features.forEach(function(f){
+  ctxFs.forEach(function(f){
+    const d=buildPath(f,fit.s,fit.tx,fit.ty);
+    if(!d) return;
+    const p=document.createElementNS(NS,"path");
+    p.setAttribute("d",d);
+    p.setAttribute("class","fpgeo-land");
+    gLand.appendChild(p);
+    const a2=NUM_TO_A2[String(f.id)];
+    bindLandTip(p,a2?displayCountryName(a2,f):null);
+  });
+  baseFs.forEach(function(f){
     const entry=entryByFeature?entryByFeature.get(f):null;
     const d=buildPath(f,fit.s,fit.tx,fit.ty);
     if(!d) return;
@@ -1074,7 +1149,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       gData.appendChild(p);
       dataShapes.push({p:p,entry:entry,fill:fill});
     } else {
-      p.setAttribute("class","fpgeo-land");
+      p.setAttribute("class",geo.baseCls||"fpgeo-land");
       gLand.appendChild(p);
       const a2=NUM_TO_A2[String(f.id)];
       const nm=(f.properties&&f.properties.nom)||(a2?displayCountryName(a2,f):null);
@@ -1141,7 +1216,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       const c=document.createElementNS(NS,"circle");
       c.setAttribute("class","fpgeo-pt");
       c.setAttribute("fill",fill);
-      c.setAttribute("fill-opacity","0.88");
+      c.setAttribute("fill-opacity","0.92");
       c.setAttribute("r",r.toFixed(1));
       bub.appendChild(c); g.appendChild(bub);
       const tv=document.createElementNS(NS,"text");
