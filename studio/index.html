@@ -1192,6 +1192,15 @@ body.fp-dark .wp-btn,body.fp-dark .demo-btn{box-shadow:0 2px 6px rgba(0,0,0,.3)}
             <div id="calc-col-samples" style="font-size:12px;color:var(--dark)"></div>
           </div>
           <div id="calc-col-err" style="display:none;color:var(--coral);font-size:12px;margin-top:8px"></div>
+          <!-- Clé OpenAI manquante : saisie directement ici -->
+          <div id="calc-col-key" style="display:none;margin-top:12px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:12px">
+            <div style="font-size:12px;font-weight:800;margin-bottom:4px">🔑 Connexion IA requise</div>
+            <div style="font-size:11px;color:var(--mid);margin-bottom:8px">Renseigne ta clé OpenAI (stockée uniquement dans ton navigateur, utilisée aussi par l'Agent Analyste).</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input id="calc-col-key-input" type="password" placeholder="sk-..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none"/>
+              <button class="btn btn-primary" type="button" onclick="calcColSaveKey()">Enregistrer</button>
+            </div>
+          </div>
         </div>
         <div style="padding:0 20px 20px;display:flex;gap:10px;justify-content:flex-end">
           <button class="btn" onclick="closeCalcColModal()">Annuler</button>
@@ -10449,7 +10458,14 @@ async function calcColGenerate(){
   if(!name){ document.getElementById('calc-col-err').textContent='Donne un nom à la colonne.'; document.getElementById('calc-col-err').style.display=''; return; }
   document.getElementById('calc-col-err').style.display = 'none';
 
-  if(!getOpenAIKey()){ showKeyPrompt(null); return; }
+  if(!getOpenAIKey()){
+    // La clé se saisit ICI (showKeyPrompt écrit dans le fil de chat IA, invisible depuis cette fenêtre)
+    const keyBox = document.getElementById('calc-col-key');
+    if(keyBox){ keyBox.style.display=''; const ki=document.getElementById('calc-col-key-input'); if(ki) setTimeout(()=>ki.focus(),50); }
+    return;
+  }
+  const keyBoxOk = document.getElementById('calc-col-key');
+  if(keyBoxOk) keyBoxOk.style.display='none';
 
   const btn = document.getElementById('calc-col-gen-btn');
   btn.disabled = true; btn.textContent = '⏳ Génération…';
@@ -10491,10 +10507,16 @@ La formule doit être robuste aux valeurs nulles/undefined.`;
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+getOpenAIKey()},
       body:JSON.stringify({
         model:'gpt-4o-mini', max_tokens:400,
+        response_format:{type:'json_object'},
         messages:[{role:'user', content:prompt}]
       })
     });
-    const data = await resp.json();
+    const data = await resp.json().catch(()=>({}));
+    if(!resp.ok){
+      const apiMsg = data?.error?.message || ('HTTP '+resp.status);
+      if(resp.status===401) throw new Error('Clé OpenAI invalide ou expirée — vérifie ta clé (bouton Enregistrer ci-dessous).');
+      throw new Error(apiMsg);
+    }
     const raw = data.choices?.[0]?.message?.content||'{}';
     const clean = raw.replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(clean);
@@ -10520,8 +10542,26 @@ La formule doit être robuste aux valeurs nulles/undefined.`;
   } catch(err) {
     document.getElementById('calc-col-err').textContent = '❌ ' + err.message;
     document.getElementById('calc-col-err').style.display = '';
+    if(String(err.message).indexOf('Clé OpenAI')===0){
+      const kb=document.getElementById('calc-col-key');
+      if(kb) kb.style.display='';
+    }
   } finally {
     btn.disabled = false; btn.textContent = '✨ Générer la formule';
+  }
+}
+
+function calcColSaveKey(){
+  const ki=document.getElementById('calc-col-key-input');
+  const val=(ki?ki.value:'').trim();
+  if(setOpenAIKey(val)){
+    document.getElementById('calc-col-key').style.display='none';
+    document.getElementById('calc-col-err').style.display='none';
+    calcColGenerate(); // relance aussitôt la génération
+  } else {
+    if(ki) ki.style.borderColor='var(--coral)';
+    document.getElementById('calc-col-err').textContent='❌ Clé invalide — elle doit commencer par « sk- ».';
+    document.getElementById('calc-col-err').style.display='';
   }
 }
 
