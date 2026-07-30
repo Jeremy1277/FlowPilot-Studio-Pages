@@ -970,30 +970,9 @@ body.fp-dark .wc-btn.zoom-btn:hover{border-color:var(--green);color:var(--green)
 body.fp-dark .wc-drag,body.fp-dark .wc-handle{color:#5f7690}
 
 /* ══════════ COQUES SUPPLÉMENTAIRES (base sombre = classe fp-dark en plus) ══════════ */
-/* ⚡ Fluo — néon électrique sur noir */
-body.fp-theme-fluo{
-  --bg:#07070d;--card:#101018;--card2:#16161f;--border:#262637;
-  --dark:#eafaea;--mid:#9fe8a8;--muted:#5f7a66;
-  --navy:#050509;--navy2:#0c0c14;
-  --accent:#39FF14;--accent2:#7dff5e;--accent-soft:rgba(57,255,20,.14);
-  --glass:rgba(16,16,24,.72);--glass-border:rgba(57,255,20,.25);
-}
-body.fp-theme-fluo .brand-logo{box-shadow:0 0 18px rgba(57,255,20,.5)}
-body.fp-theme-fluo .btn-primary,body.fp-theme-fluo .step-btn.active{box-shadow:0 0 14px rgba(57,255,20,.45)}
 
-/* 🌴 Miami Vice — rose néon & turquoise sur nuit violette */
-body.fp-theme-miami{
-  --bg:#120a24;--card:#1b1035;--card2:#221543;--border:#3a2566;
-  --dark:#f4e9ff;--mid:#c2a8e8;--muted:#8a6fb8;
-  --navy:#0c0618;--navy2:#160c2c;
-  --accent:#ff2d95;--accent2:#ff5fb0;--accent-soft:rgba(255,45,149,.16);
-  --green:#00d4d4;--green-soft:rgba(0,212,212,.16);
-  --glass:rgba(27,16,53,.72);--glass-border:rgba(255,45,149,.28);
-}
-body.fp-theme-miami .brand-logo{box-shadow:0 0 18px rgba(255,45,149,.5)}
-body.fp-theme-miami .btn-primary,body.fp-theme-miami .step-btn.active{box-shadow:0 0 14px rgba(255,45,149,.4)}
 
-/* 🕺 70's — chaleur seventies, base claire */
+/* 🎷 Smooth — chaleur seventies, base claire */
 body.fp-theme-seventies{
   --bg:#f3ead8;--card:#fbf4e4;--card2:#f5ecd6;--border:#e2cfae;
   --dark:#41301e;--mid:#7d6547;--muted:#a08a68;
@@ -1004,16 +983,22 @@ body.fp-theme-seventies{
 }
 body.fp-theme-seventies #topbar{background:#f7efdd}
 
-/* 📈 Wall Street 80's — costume rayé, or et vert terminal */
-body.fp-theme-wallstreet{
-  --bg:#0a0e0c;--card:#111814;--card2:#16201a;--border:#26382d;
-  --dark:#e9f2ea;--mid:#9fb8a6;--muted:#688a72;
-  --navy:#060a08;--navy2:#0d1310;
-  --accent:#d4af37;--accent2:#e3c35c;--accent-soft:rgba(212,175,55,.15);
-  --green:#00c853;--green-soft:rgba(0,200,83,.15);
-  --glass:rgba(17,24,20,.72);--glass-border:rgba(212,175,55,.3);
+/* 🎨 Pantone© — nuancier : papier neutre, Viva Magenta, Classic Blue, Greenery */
+body.fp-theme-pantone{
+  --bg:#f1f0eb;--card:#ffffff;--card2:#f7f6f2;--border:#e2e0d8;
+  --dark:#2b2b28;--mid:#6b6b66;--muted:#98978f;
+  --navy:#2b2b28;--navy2:#3a3a36;
+  --accent:#BB2649;--accent2:#d64a6f;--accent-soft:rgba(187,38,73,.10);
+  --steel:#0F4C81;--green:#88B04B;--green-soft:rgba(136,176,75,.16);
+  --purple:#6667AB;--coral:#FF6F61;--coral-soft:rgba(255,111,97,.14);
+  --glass:rgba(255,255,255,.8);--glass-border:rgba(190,188,178,.6);
 }
-body.fp-theme-wallstreet .brand-logo{box-shadow:0 0 14px rgba(212,175,55,.4)}
+body.fp-theme-pantone #topbar{background:#fff;border-bottom:3px solid var(--accent)}
+body.fp-theme-pantone .brand-logo{background:var(--accent);color:#fff}
+body.fp-theme-pantone .wc,body.fp-theme-pantone .widget-card{border-bottom:4px solid var(--accent)}
+body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:#fff}
+
+
 
 </style>
 <body>
@@ -1810,12 +1795,10 @@ let chartInstances={};
 // Une coque = un jeu de variables CSS. base:'dark' ajoute la classe fp-dark
 // (graphiques, carte et champs passent en rendu nuit automatiquement).
 const FP_SKINS=[
-  {id:'light',      label:'Clair',            icon:'☀️', base:'light', cls:null,                  grid:'#f0f3f7', chartText:'#666'},
-  {id:'dark',       label:'Sombre',           icon:'🌙', base:'dark',  cls:null,                  grid:'#233245', chartText:'#9db0c5'},
-  {id:'fluo',       label:'Fluo',             icon:'⚡', base:'dark',  cls:'fp-theme-fluo',       grid:'#1d2a1d', chartText:'#9fe8a8'},
-  {id:'miami',      label:'Miami Vice',       icon:'🌴', base:'dark',  cls:'fp-theme-miami',      grid:'#2c1d4e', chartText:'#c2a8e8'},
-  {id:'seventies',  label:"70's",             icon:'🕺', base:'light', cls:'fp-theme-seventies',  grid:'#e8d9bc', chartText:'#7d6547'},
-  {id:'wallstreet', label:"Wall Street 80's", icon:'📈', base:'dark',  cls:'fp-theme-wallstreet', grid:'#1e2c23', chartText:'#9fb8a6'},
+  {id:'light',     label:'Clair',     icon:'☀️', base:'light', cls:null,                 grid:'#f0f3f7', chartText:'#666'},
+  {id:'dark',      label:'Sombre',    icon:'🌙', base:'dark',  cls:null,                 grid:'#233245', chartText:'#9db0c5'},
+  {id:'seventies', label:'Smooth',    icon:'🎷', base:'light', cls:'fp-theme-seventies', grid:'#e8d9bc', chartText:'#7d6547'},
+  {id:'pantone',   label:'Pantone©',  icon:'🎨', base:'light', cls:'fp-theme-pantone',   grid:'#eceae3', chartText:'#6b6b66'},
 ];
 const FP_THEME={grid:'#f0f3f7',text:'#1a2733',halo:'rgba(255,255,255,.92)'};
 window.FP_THEME=FP_THEME; // exposé aux modules (bar.js…) — const de script ≠ propriété window
