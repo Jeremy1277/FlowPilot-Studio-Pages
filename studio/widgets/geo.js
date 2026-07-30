@@ -42,7 +42,9 @@ const ISO2_TO_NUM = {
   UG:"800",UM:"581",US:"840",UY:"858",UZ:"860",VA:"336",VC:"670",VE:"862",VG:"92",VI:"850",
   VN:"704",VU:"548",WF:"876",WS:"882",YE:"887",YT:"175",ZA:"710",ZM:"894",ZW:"716",
 };
-const NUM_TO_A2 = {}; Object.keys(ISO2_TO_NUM).forEach(a2=>{ NUM_TO_A2[ISO2_TO_NUM[a2]]=a2; });
+// Les ids de world-atlas sont sur 3 chiffres avec zéros initiaux (« 056 » pour la
+// Belgique) : on enregistre les deux formes pour que tous les pays matchent.
+const NUM_TO_A2 = {}; Object.keys(ISO2_TO_NUM).forEach(a2=>{ const n=ISO2_TO_NUM[a2]; NUM_TO_A2[n]=a2; NUM_TO_A2[('00'+n).slice(-3)]=a2; });
 
 // Nom officiel ISO (anglais) -> alpha-2
 const ISO_NAME_TO_A2 = {
@@ -755,8 +757,8 @@ function withFocusBg(prep, focusCC, world){
 /* ── Préparation des scènes ───────────────────────────────────────────── */
 
 function aggInto(byKey,key,label,value){
-  if(byKey[key]) byKey[key].value+=(+value||0);
-  else byKey[key]={label:label,value:(+value||0)};
+  if(byKey[key]){ byKey[key].value+=(+value||0); byKey[key].labels.push(String(label)); }
+  else byKey[key]={label:label,value:(+value||0),labels:[String(label)]};
 }
 
 function prepCountry(w,features,rawLabels,rawValues){
@@ -780,7 +782,7 @@ function prepCountry(w,features,rawLabels,rawValues){
   featureSet.forEach(function(f){
     const a2=NUM_TO_A2[String(f.id)];
     const m=a2?byA2[a2]:null;
-    if(m){ entries.push({key:a2,feature:f,value:m.value,name:displayCountryName(a2,f)}); seen[a2]=1; }
+    if(m){ entries.push({key:a2,feature:f,value:m.value,name:displayCountryName(a2,f),labels:m.labels}); seen[a2]=1; }
   });
   matched.forEach(function(a2){ if(!seen[a2]) unmatched.push(byA2[a2].label+" (non affichable)"); });
   if(!entries.length) return {error:"Aucun pays affichable dans cette colonne"};
@@ -802,7 +804,7 @@ function prepDept(w,features,rawLabels,rawValues){
   features.forEach(function(f){
     const code=f.properties&&f.properties.code;
     const m=code?byKey[code]:null;
-    if(m){ entries.push({key:code,feature:f,value:m.value,name:(f.properties.nom||code)+" ("+code+")"}); seen[code]=1; }
+    if(m){ entries.push({key:code,feature:f,value:m.value,name:(f.properties.nom||code)+" ("+code+")",labels:m.labels}); seen[code]=1; }
   });
   Object.keys(byKey).forEach(function(k){ if(!seen[k]) unmatched.push(byKey[k].label+" (hors métropole)"); });
   if(!entries.length) return {error:"Aucun département métropolitain reconnu"};
@@ -833,7 +835,7 @@ function prepCpZones(w,cc,pcData,rawLabels,rawValues){
 
   const points=keys.map(function(k){
     const z=C.zones[k];
-    return {key:k,name:"Zone "+k,lat:z[0],lon:z[1],value:byKey[k].value};
+    return {key:k,name:"Zone "+k,lat:z[0],lon:z[1],value:byKey[k].value,labels:byKey[k].labels};
   });
   return {kind:"points",points:points,clip:null,unmatched:unmatched};
 }
@@ -853,11 +855,39 @@ function prepCity(w,places,rawLabels,rawValues){
   if(!keys.length) return {error:"Aucune ville reconnue dans cette colonne"};
 
   const points=keys.map(function(k){
-    return {key:k,name:meta[k].name,lat:meta[k].lat,lon:meta[k].lon,value:byKey[k].value};
+    return {key:k,name:meta[k].name,lat:meta[k].lat,lon:meta[k].lon,value:byKey[k].value,labels:byKey[k].labels};
   });
   let cc=null;
   if(keys.length&&keys.every(function(k){ return meta[k].cc===meta[keys[0]].cc; })) cc=meta[keys[0]].cc;
   return {kind:"points",points:points,cc:cc,clip:null,unmatched:unmatched};
+}
+
+/* ── Détail par catégorie (carte à camemberts) ────────────────────────── */
+
+const GEO_CAT_COLORS=["#EF9F27","#4a7fa5","#1D9E75","#7F77DD","#D85A30","#D4537E","#38bdf8","#85BC25"];
+const GEO_CAT_OTHER="#9aa7b6";
+function geoCatColor(cat,ci){ return cat==="Autres"?GEO_CAT_OTHER:GEO_CAT_COLORS[ci%GEO_CAT_COLORS.length]; }
+
+// Secteur annulaire (camembert troué), centré sur l'origine
+function geoArcPath(r0,r1,a0,a1){
+  if(a1-a0>=Math.PI*2) a1=a0+Math.PI*2-0.0001;
+  const large=(a1-a0)>Math.PI?1:0;
+  const x0=r1*Math.cos(a0),y0=r1*Math.sin(a0),x1=r1*Math.cos(a1),y1=r1*Math.sin(a1);
+  const xi0=r0*Math.cos(a1),yi0=r0*Math.sin(a1),xi1=r0*Math.cos(a0),yi1=r0*Math.sin(a0);
+  return "M"+x0.toFixed(2)+","+y0.toFixed(2)
+    +"A"+r1.toFixed(2)+","+r1.toFixed(2)+" 0 "+large+" 1 "+x1.toFixed(2)+","+y1.toFixed(2)
+    +"L"+xi0.toFixed(2)+","+yi0.toFixed(2)
+    +"A"+r0.toFixed(2)+","+r0.toFixed(2)+" 0 "+large+" 0 "+xi1.toFixed(2)+","+yi1.toFixed(2)+"Z";
+}
+
+// Fusionne le détail catégoriel de tous les libellés bruts rattachés à un lieu
+function geoBdFor(bd,labels){
+  const vals={}; let total=0;
+  (labels||[]).forEach(function(l){
+    const m=bd.byPlace[l]; if(!m) return;
+    Object.keys(m).forEach(function(c){ vals[c]=(vals[c]||0)+m[c]; total+=m[c]; });
+  });
+  return {vals:vals,total:total};
 }
 
 /* ── CSS injecté ──────────────────────────────────────────────────────── */
@@ -890,6 +920,7 @@ function fpgeoInjectCSS(){
     ".fpgeo-lbl-val{font-family:'Barlow Condensed','DM Sans',Arial,sans-serif;font-weight:800;fill:#0D1B2A;paint-order:stroke;stroke:rgba(255,255,255,.92);stroke-width:3.4px;stroke-linejoin:round;letter-spacing:.02em}",
     ".fpgeo-ptlbl-name{font-family:'DM Sans',Arial,sans-serif;font-weight:700;font-size:10px;fill:#132A3A;paint-order:stroke;stroke:rgba(255,255,255,.9);stroke-width:3px;stroke-linejoin:round;pointer-events:none}",
     ".fpgeo-ptlbl-val{font-family:'Barlow Condensed','DM Sans',Arial,sans-serif;font-weight:800;fill:#fff;pointer-events:none}",
+    ".fpgeo-ptlbl-vald{font-family:'Barlow Condensed','DM Sans',Arial,sans-serif;font-weight:800;fill:#13293a;pointer-events:none}",
     '.fpgeo-ctrls{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;opacity:0;transition:opacity .25s ease;z-index:3}',
     '.fpgeo-stage:hover .fpgeo-ctrls{opacity:1}',
     '.fpgeo-btn{width:26px;height:26px;border-radius:8px;border:1px solid rgba(13,27,42,.08);background:rgba(255,255,255,.92);backdrop-filter:blur(4px);color:#31465c;font-size:14px;font-weight:700;line-height:1;display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(13,27,42,.10);transition:background .15s,transform .12s;padding:0}',
@@ -911,7 +942,7 @@ function fpgeoInjectCSS(){
 
 /* ── Point d'entrée ───────────────────────────────────────────────────── */
 
-export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum, canvasId){
+export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum, canvasId, breakdown){
   const el=document.getElementById(elId);
   if(!el) return;
   if(!canvasId) canvasId="cvg"+w.id.replace(/[^a-zA-Z0-9]/g,"");
@@ -944,11 +975,13 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
   function fail(){
     el.innerHTML='<div class="wc-empty"><div class="we-icon">⚠️</div><div>Impossible de charger le fond de carte</div></div>';
   }
+  const bd=(breakdown&&breakdown.cats&&breakdown.cats.length&&breakdown.byPlace)?breakdown:null;
   function start(geo){
     if(geo.error){
       el.innerHTML='<div class="wc-empty"><div class="we-icon">🌍</div><div>'+geo.error+'</div></div>';
       return;
     }
+    geo.breakdown=bd;
     buildGeoScene(w, el, canvasId, chartInstances, fmtW, geo, 0, false);
   }
 
@@ -995,6 +1028,8 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   }
 
   const isChoro=geo.kind==="choro";
+  const bd=geo.breakdown||null;
+  const donutMode=!!bd;
   const items=isChoro?geo.entries:geo.points;
   const values=items.map(function(it){return it.value;});
   const vmin=Math.min.apply(null,values), vmax=Math.max.apply(null,values);
@@ -1084,13 +1119,13 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       const B=bubbles[i];
       const r=B.r*ks;
       B.g.setAttribute("transform","translate("+(B.x*z.k+z.tx)+" "+(B.y*z.k+z.ty)+")");
-      B.circle.setAttribute("r",r.toFixed(1));
-      const fs=Math.max(9,Math.min(13,r*0.75));
-      const fits=B.valLen*fs*0.56<=r*2.1;
+      B.scaleG.setAttribute("transform","scale("+ks.toFixed(3)+")");
+      const fits=B.donut
+        ? B.valLen*B.fs*0.56<=B.r*0.8
+        : B.valLen*B.fs*0.56<=B.r*2.1;
       const showVal=labelsOn&&r>=11&&fits;
       const showName=labelsOn&&(B.rank<=6||r>=13);
       B.tVal.style.opacity=showVal?1:0;
-      B.tVal.setAttribute("font-size",fs.toFixed(1));
       B.tName.style.opacity=showName?1:0;
       B.tName.setAttribute("y",(r+11).toFixed(1));
     }
@@ -1107,11 +1142,12 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
     tip.style.left=Math.max(4,x)+"px";
     tip.style.top=Math.max(4,y)+"px";
   }
-  function showTip(name,value,fill,key,e){
+  function showTip(name,value,fill,key,e,extraHtml){
     const pct=(total>0&&isFinite(value))?(value/total*100):null;
     tip.innerHTML='<div class="fpgeo-tip-name"><span class="fpgeo-tip-dot" style="background:'+fill+'"></span>'+name+'</div>'
       +'<div class="fpgeo-tip-val">'+fmtNum(value)+'</div>'
-      +(pct!=null?'<div class="fpgeo-tip-sub">'+pct.toLocaleString("fr-FR",{maximumFractionDigits:1})+' % du total · n° '+rankOf[key]+'/'+items.length+'</div>':'');
+      +(pct!=null?'<div class="fpgeo-tip-sub">'+pct.toLocaleString("fr-FR",{maximumFractionDigits:1})+' % du total · n° '+rankOf[key]+'/'+items.length+'</div>':'')
+      +(extraHtml||'');
     tip.classList.add("fpgeo-tip-on");
     moveTip(e);
   }
@@ -1143,7 +1179,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
     bindLandTip(p,a2?displayCountryName(a2,f):null);
   });
   baseFs.forEach(function(f,bi){
-    const entry=entryByFeature?entryByFeature.get(f):null;
+    const entry=(entryByFeature&&!donutMode)?entryByFeature.get(f):null;
     const d=buildPath(f,fit.s,fit.tx,fit.ty);
     if(!d) return;
     const p=document.createElementNS(NS,"path");
@@ -1166,7 +1202,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   });
 
   // labels choroplèthe (nom + valeur), du plus fort au plus faible
-  if(isChoro){
+  if(isChoro&&!donutMode){
     dataShapes.sort(function(a,b){return b.entry.value-a.entry.value;});
     dataShapes.forEach(function(s,i){
       const lb=largestRingInfo(s.entry.feature,fit.s,fit.tx,fit.ty);
@@ -1209,46 +1245,104 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   }
 
   // bulles proportionnelles (villes / zones postales)
-  if(!isChoro){
+  let ptItems=null;
+  if(!isChoro) ptItems=items.map(function(pt){
+    return {key:pt.key,name:pt.name,value:pt.value,labels:pt.labels,
+      bx:projX(pt.lon)*fit.s+fit.tx, by:projY(pt.lat)*fit.s+fit.ty};
+  });
+  else if(donutMode){
+    // choroplèthe + détail catégoriel -> camemberts posés au centroïde de chaque zone
+    ptItems=[];
+    items.forEach(function(e){
+      const lb=largestRingInfo(e.feature,fit.s,fit.tx,fit.ty);
+      if(!lb||!isFinite(lb.cx)||!isFinite(lb.cy)) return;
+      ptItems.push({key:e.key,name:e.name,value:e.value,labels:e.labels,bx:lb.cx,by:lb.cy});
+    });
+  }
+  if(ptItems){
     const rMax=Math.max(14,Math.min(30,Math.min(W,H)*0.055));
-    const rMin=Math.min(7,rMax*0.45);
-    const ptsSorted=items.slice().sort(function(a,b){return b.value-a.value;});
+    const rMin=Math.min(donutMode?9:7,rMax*0.45);
+    const ptsSorted=ptItems.slice().sort(function(a,b){return b.value-a.value;});
     ptsSorted.forEach(function(pt,i){
       const t=tOf(pt.value);
-      const r=items.length===1?rMax*0.75:rMin+(rMax-rMin)*Math.sqrt(Math.max(0,t));
-      const fill=scheme.fill(0.5+t*0.5); // plancher relevé : les petites bulles restent bien visibles
+      const r=ptsSorted.length===1?rMax*0.75:rMin+(rMax-rMin)*Math.sqrt(Math.max(0,t));
+      const fill=scheme.fill(0.5+t*0.5);
       const g=document.createElementNS(NS,"g");
       g.setAttribute("class","fpgeo-ptg");
+      const gScale=document.createElementNS(NS,"g");
       const bub=document.createElementNS(NS,"g");
       bub.setAttribute("class","fpgeo-bub");
-      const c=document.createElementNS(NS,"circle");
-      c.setAttribute("class","fpgeo-pt");
-      c.setAttribute("fill",fill);
-      c.setAttribute("fill-opacity","0.92");
-      c.setAttribute("r",r.toFixed(1));
-      bub.appendChild(c); g.appendChild(bub);
+      let segsInfo=null;
+      if(donutMode){
+        const bf=geoBdFor(bd,pt.labels);
+        if(bf.total>0){
+          segsInfo=[];
+          let a=-Math.PI/2;
+          bd.cats.forEach(function(cat,ci){
+            const v=bf.vals[cat]||0;
+            if(v<=0) return;
+            const a2=a+(v/bf.total)*Math.PI*2;
+            const seg=document.createElementNS(NS,"path");
+            seg.setAttribute("class","fpgeo-pt");
+            seg.setAttribute("d",geoArcPath(r*0.42,r,a,a2));
+            seg.setAttribute("fill",geoCatColor(cat,ci));
+            bub.appendChild(seg);
+            segsInfo.push({cat:cat,v:v,color:geoCatColor(cat,ci)});
+            a=a2;
+          });
+          const hole=document.createElementNS(NS,"circle");
+          hole.setAttribute("r",(r*0.42).toFixed(1));
+          hole.setAttribute("fill","rgba(255,255,255,.94)");
+          bub.appendChild(hole);
+        }
+      }
+      let c=null;
+      if(!segsInfo){
+        c=document.createElementNS(NS,"circle");
+        c.setAttribute("class","fpgeo-pt");
+        c.setAttribute("fill",fill);
+        c.setAttribute("fill-opacity","0.92");
+        c.setAttribute("r",r.toFixed(1));
+        bub.appendChild(c);
+      }
+      const fs=Math.max(8,Math.min(13,r*0.75));
       const tv=document.createElementNS(NS,"text");
-      tv.setAttribute("class","fpgeo-ptlbl-val");
+      tv.setAttribute("class",segsInfo?"fpgeo-ptlbl-vald":"fpgeo-ptlbl-val");
       tv.setAttribute("text-anchor","middle");
-      tv.setAttribute("dy","3.5");
+      tv.setAttribute("dy","3.2");
+      tv.setAttribute("font-size",fs.toFixed(1));
       tv.style.opacity=0;
       tv.textContent=fmtNum(pt.value);
+      bub.appendChild(tv);
+      gScale.appendChild(bub); g.appendChild(gScale);
       const tn=document.createElementNS(NS,"text");
       tn.setAttribute("class","fpgeo-ptlbl-name");
       tn.setAttribute("text-anchor","middle");
       tn.style.opacity=0;
       tn.textContent=pt.name;
-      g.appendChild(tv); g.appendChild(tn);
+      g.appendChild(tn);
       gPts.appendChild(g);
-      const B={g:g,circle:c,tName:tn,tVal:tv,valLen:fmtNum(pt.value).length,
-        x:projX(pt.lon)*fit.s+fit.tx, y:projY(pt.lat)*fit.s+fit.ty,
-        r:r, rank:i+1, pt:pt, fill:fill};
+      const B={g:g,scaleG:gScale,tName:tn,tVal:tv,fs:fs,valLen:fmtNum(pt.value).length,
+        donut:!!segsInfo,x:pt.bx,y:pt.by,r:r,rank:i+1,pt:pt,fill:fill};
       bubbles.push(B);
       g.addEventListener("pointerenter",function(e){
         gPts.classList.add("fpgeo-hovering");
         g.classList.add("fpgeo-hover");
         gPts.appendChild(g);
-        showTip(pt.name,pt.value,fill,pt.key,e);
+        let extra="";
+        if(segsInfo){
+          const tot=segsInfo.reduce(function(sm,x){return sm+x.v;},0);
+          extra=segsInfo.slice().sort(function(a,b){return b.v-a.v;}).map(function(x){
+            const pc=tot>0?(x.v/tot*100):0;
+            return '<div style="display:flex;align-items:center;gap:6px;font-size:10px;margin-top:3px">'
+              +'<span class="fpgeo-tip-dot" style="background:'+x.color+'"></span>'
+              +'<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:110px">'+x.cat+'</span>'
+              +'<span style="margin-left:auto;font-weight:700">'+fmtNum(x.v)+'</span>'
+              +'<span style="color:rgba(255,255,255,.55)">'+pc.toLocaleString("fr-FR",{maximumFractionDigits:0})+'%</span>'
+              +'</div>';
+          }).join("");
+        }
+        showTip(pt.name,pt.value,fill,pt.key,e,extra);
       });
       g.addEventListener("pointermove",moveTip);
       g.addEventListener("pointerleave",function(){
@@ -1384,10 +1478,19 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   // ---- légende + avertissements ------------------------------------------
   const legendEl=document.getElementById(canvasId+"-legend");
   if(legendEl){
-    legendEl.innerHTML=
-      '<span>'+fmtNum(vmin)+'</span>'
-      +'<span style="flex:1;height:7px;border-radius:4px;background:'+scheme.cssGradient+';box-shadow:inset 0 0 0 1px rgba(13,27,42,.06)"></span>'
-      +'<span>'+fmtNum(vmax)+'</span>';
+    if(donutMode){
+      legendEl.style.flexWrap="wrap";
+      legendEl.innerHTML=bd.cats.map(function(cat,ci){
+        return '<span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap">'
+          +'<span style="width:8px;height:8px;border-radius:99px;background:'+geoCatColor(cat,ci)+';box-shadow:inset 0 0 0 1px rgba(13,27,42,.15)"></span>'
+          +cat+'</span>';
+      }).join('');
+    } else {
+      legendEl.innerHTML=
+        '<span>'+fmtNum(vmin)+'</span>'
+        +'<span style="flex:1;height:7px;border-radius:4px;background:'+scheme.cssGradient+';box-shadow:inset 0 0 0 1px rgba(13,27,42,.06)"></span>'
+        +'<span>'+fmtNum(vmax)+'</span>';
+    }
   }
   const warnEl=document.getElementById(canvasId+"-warn");
   if(warnEl){
