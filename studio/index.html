@@ -6759,14 +6759,14 @@ function fpgeoInjectCSS(){
   st.id="fpgeo-style";
   st.textContent=[
     '.fpgeo-stage{position:relative;flex:1;min-height:110px;overflow:hidden;border-radius:12px;cursor:grab;',
-    ' background:radial-gradient(130% 100% at 28% 8%,rgba(255,255,255,.75) 0%,rgba(255,255,255,0) 52%),linear-gradient(160deg,#e8f1fa 0%,#d3e1f0 58%,#c6d7ea 100%);',
-    ' box-shadow:inset 0 0 0 1px rgba(13,27,42,.07)}',
+    ' background:radial-gradient(130% 100% at 28% 8%,rgba(255,255,255,.8) 0%,rgba(255,255,255,0) 55%),linear-gradient(160deg,#d9e8f9 0%,#c2d8f0 55%,#b1cbe8 100%);',
+    ' box-shadow:inset 0 0 0 1px rgba(13,27,42,.08)}',
     '.fpgeo-stage.fpgeo-drag{cursor:grabbing}',
     '.fpgeo-svg{position:absolute;inset:0;width:100%;height:100%;display:block}',
-    '.fpgeo-land{fill:#b9c7d9;stroke:#f4f8fc;stroke-width:.8;vector-effect:non-scaling-stroke;transition:fill .15s ease}',
-    '.fpgeo-land:hover{fill:#aebfd4}',
-    '.fpgeo-region{fill:#e9eff7;stroke:#9fb2c9;stroke-width:.6;vector-effect:non-scaling-stroke;transition:fill .15s ease}',
-    '.fpgeo-region:hover{fill:#dde7f2}',
+    '.fpgeo-land{fill:#e6e9ee;stroke:#8ea3ba;stroke-width:.7;vector-effect:non-scaling-stroke;transition:filter .15s ease}',
+    '.fpgeo-land:hover{filter:brightness(1.05)}',
+    '.fpgeo-region{fill:#f6f8fb;stroke:#a3b5ca;stroke-width:.65;vector-effect:non-scaling-stroke;transition:filter .15s ease}',
+    '.fpgeo-region:hover{filter:brightness(1.03) saturate(1.05)}',
     '.fpgeo-c{stroke:#fff;stroke-width:1;vector-effect:non-scaling-stroke;cursor:pointer;transition:filter .18s ease,opacity .5s ease}',
     '.fpgeo-data.fpgeo-hovering .fpgeo-c:not(.fpgeo-hover){opacity:.72}',
     '.fpgeo-c.fpgeo-hover{filter:brightness(1.1) saturate(1.08);stroke-width:1.8}',
@@ -7023,17 +7023,19 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   // ---- fond (contexte monde + découpage du pays) + couches de données ----
   const entryByFeature=isChoro?new Map(geo.entries.map(function(e){return [e.feature,e];})):null;
   const dataShapes=[];
-  ctxFs.forEach(function(f){
+  const LAND_TINTS=["#eef0f3","#e4e8ed","#dae0e8"];
+  ctxFs.forEach(function(f,i){
     const d=buildPath(f,fit.s,fit.tx,fit.ty);
     if(!d) return;
     const p=document.createElementNS(NS,"path");
     p.setAttribute("d",d);
     p.setAttribute("class","fpgeo-land");
+    p.style.fill=LAND_TINTS[i%3]; // teintes alternées : chaque pays se distingue
     gLand.appendChild(p);
     const a2=NUM_TO_A2[String(f.id)];
     bindLandTip(p,a2?geoDisplayName(a2,f):null);
   });
-  baseFs.forEach(function(f){
+  baseFs.forEach(function(f,bi){
     const entry=entryByFeature?entryByFeature.get(f):null;
     const d=buildPath(f,fit.s,fit.tx,fit.ty);
     if(!d) return;
@@ -7046,7 +7048,9 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       gData.appendChild(p);
       dataShapes.push({p:p,entry:entry,fill:fill});
     } else {
-      p.setAttribute("class",geo.baseCls||"fpgeo-land");
+      const cls=geo.baseCls||"fpgeo-land";
+      p.setAttribute("class",cls);
+      if(cls==="fpgeo-land") p.style.fill=LAND_TINTS[(ctxFs.length+bi)%3];
       gLand.appendChild(p);
       const a2=NUM_TO_A2[String(f.id)];
       const nm=(f.properties&&f.properties.nom)||(a2?geoDisplayName(a2,f):null);
@@ -7105,7 +7109,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
     ptsSorted.forEach(function(pt,i){
       const t=tOf(pt.value);
       const r=items.length===1?rMax*0.75:rMin+(rMax-rMin)*Math.sqrt(Math.max(0,t));
-      const fill=scheme.fill(0.35+t*0.65); // plancher relevé : les petites bulles restent visibles
+      const fill=scheme.fill(0.5+t*0.5); // plancher relevé : les petites bulles restent bien visibles
       const g=document.createElementNS(NS,"g");
       g.setAttribute("class","fpgeo-ptg");
       const bub=document.createElementNS(NS,"g");
