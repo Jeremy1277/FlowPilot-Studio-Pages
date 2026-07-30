@@ -389,6 +389,46 @@ function gradientShade(baseHex,t){
 const GEO_NODATA_COLOR="#e7ecf2";
 
 /* ============================================================================
+ * Jeux de couleurs (dégradés séquentiels clair → foncé)
+ * w.geoPalette : 'ambre' (défaut) | 'ocean' | 'chaleur' | 'emeraude' | 'violet'
+ *                | 'rose' | 'perso' (dégradé monochrome basé sur w.color)
+ * ========================================================================= */
+export const GEO_PALETTES={
+  ambre:    { label:"Ambre",     stops:["#fdf3df","#f7ca77","#EF9F27","#8a4d0a"] },
+  ocean:    { label:"Océan",     stops:["#eaf3fb","#a8c9e4","#4a7fa5","#16324a"] },
+  chaleur:  { label:"Chaleur",   stops:["#fff6d8","#f9b64e","#e2622f","#7f1d1d"] },
+  emeraude: { label:"Émeraude",  stops:["#e8f7ef","#8fd6b1","#1D9E75","#0b4636"] },
+  violet:   { label:"Violet",    stops:["#f1effc","#bcb2ee","#7F77DD","#372e7a"] },
+  rose:     { label:"Rose",      stops:["#fdeef4","#f2a9c4","#D4537E","#7a1f41"] },
+};
+
+function hexToRgb(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+function rampColor(stops,t){
+  t=Math.max(0,Math.min(1,t));
+  const n=stops.length-1, seg=Math.min(n-0.000001,t*n);
+  const i=Math.floor(seg), f=seg-i;
+  const a=hexToRgb(stops[i]), b=hexToRgb(stops[i+1]);
+  return "rgb("+Math.round(a[0]+(b[0]-a[0])*f)+","+Math.round(a[1]+(b[1]-a[1])*f)+","+Math.round(a[2]+(b[2]-a[2])*f)+")";
+}
+// Renvoie {fill(t), cssGradient} selon la palette du widget
+function geoColorScheme(w){
+  const baseColor=(w.color&&w.color[0]==="#")?w.color:"#4a7fa5";
+  const pal=(w.geoPalette&&w.geoPalette!=="perso")?(GEO_PALETTES[w.geoPalette]||GEO_PALETTES.ambre):null;
+  if(!w.geoPalette) return schemeFromPalette(GEO_PALETTES.ambre);       // défaut
+  if(pal) return schemeFromPalette(pal);
+  return {                                                              // 'perso'
+    fill:function(t){ return gradientShade(baseColor,Math.max(0.12,t)); },
+    cssGradient:"linear-gradient(90deg,"+gradientShade(baseColor,0.12)+","+gradientShade(baseColor,1)+")"
+  };
+}
+function schemeFromPalette(pal){
+  return {
+    fill:function(t){ return rampColor(pal.stops,0.08+t*0.92); },
+    cssGradient:"linear-gradient(90deg,"+pal.stops.join(",")+")"
+  };
+}
+
+/* ============================================================================
  * Moteur de rendu SVG — carte choroplèthe dynamique FlowPilot
  * Zoom cinématique à l'ouverture, survol + tooltip, zoom molette / pan / boutons.
  * chartjs-chart-geo n'est plus utilisé que pour la conversion TopoJSON→GeoJSON
@@ -444,14 +484,20 @@ function fitTransform(b,w,h,pad){
   return { s:s, tx:(w-s*(b[0]+b[2]))/2, ty:(h-s*(b[1]+b[3]))/2 };
 }
 
-// Chemin SVG « cuit » dans le repère écran du cadrage de base
+// Chemin SVG « cuit » dans le repère écran du cadrage de base.
+// Les segments qui traversent l'antiméridien (saut de longitude > 180°) sont
+// coupés en sous-chemins pour éviter les traînées horizontales sur la vue Monde.
 function buildPath(f,s,tx,ty){
   let d="";
   featureRings(f).forEach(function(ring){
+    let prevLon=null;
     for(let i=0;i<ring.length;i++){
-      const x=(projX(ring[i][0])*s+tx).toFixed(2);
+      const lon=ring[i][0];
+      const x=(projX(lon)*s+tx).toFixed(2);
       const y=(projY(ring[i][1])*s+ty).toFixed(2);
-      d+=(i===0?"M":"L")+x+","+y;
+      const jump=prevLon!==null&&Math.abs(lon-prevLon)>180;
+      d+=((i===0||jump)?"M":"L")+x+","+y;
+      prevLon=lon;
     }
     d+="Z";
   });
@@ -587,7 +633,7 @@ function buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fm
   let total=0; values.forEach(function(v){ total+=(+v||0); });
   const sortedA2=matchedA2.slice().sort(function(a,b){return byA2[b].value-byA2[a].value;});
   const rankOf={}; sortedA2.forEach(function(a2,i){ rankOf[a2]=i+1; });
-  const baseColor=(w.color&&w.color[0]==="#")?w.color:"#4a7fa5";
+  const scheme=geoColorScheme(w);
 
   // ---- cadrage : zoom auto sur la zone des données -----------------------
   const clip=scope==="europe"?[-25,34,35,72]:[-179.9,-56,179.9,84];
@@ -665,7 +711,7 @@ function buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fm
     p.setAttribute("d",d);
     if(m){
       const t=vmax>vmin?(m.value-vmin)/(vmax-vmin):0.7;
-      const fill=gradientShade(baseColor,Math.max(0.12,t));
+      const fill=scheme.fill(t);
       p.setAttribute("class","fpgeo-c");
       p.setAttribute("fill",fill);
       gData.appendChild(p);
@@ -877,7 +923,7 @@ function buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fm
   if(legendEl){
     legendEl.innerHTML=
       '<span>'+fmtNum(vmin)+'</span>'
-      +'<span style="flex:1;height:7px;border-radius:4px;background:linear-gradient(90deg,'+gradientShade(baseColor,0.12)+','+gradientShade(baseColor,1)+');box-shadow:inset 0 0 0 1px rgba(13,27,42,.06)"></span>'
+      +'<span style="flex:1;height:7px;border-radius:4px;background:'+scheme.cssGradient+';box-shadow:inset 0 0 0 1px rgba(13,27,42,.06)"></span>'
       +'<span>'+fmtNum(vmax)+'</span>';
   }
   const warnEl=document.getElementById(canvasId+"-warn");
