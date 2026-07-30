@@ -1914,16 +1914,16 @@ function aggregate(values, aggr){
   const clean=values.filter(v=>v!==''&&v!=null);
   if(aggr==='count') return clean.length;
   if(aggr==='countd') return [...new Set(clean.map(v=>String(v)))].length;
+  if(aggr==='age'){
+    // Calculer l'âge moyen en années depuis des dates (avant conversion numérique)
+    const now=Date.now();
+    const ages=clean.map(v=>{ const d=parseDateValue(v); return d?Math.floor((now-d.getTime())/(365.25*24*3600*1000)):null; }).filter(v=>v!==null&&v>0&&v<120);
+    return ages.length?Math.round(ages.reduce((s,v)=>s+v,0)/ages.length*10)/10:0;
+  }
   const nums=clean.map(v=>parseFloat(String(v??0).replace(/\s/g,'').replace(',','.'))).filter(v=>!isNaN(v));
   if(!nums.length) return 0;
   if(aggr==='sum') return nums.reduce((s,v)=>s+v,0);
   if(aggr==='avg') return nums.reduce((s,v)=>s+v,0)/nums.length;
-  if(aggr==='age'){
-    // Calculer l'âge moyen en années depuis des dates
-    const now=Date.now();
-    const ages=vals.map(v=>{ const d=parseDateValue(v); return d?Math.floor((now-d.getTime())/(365.25*24*3600*1000)):null; }).filter(v=>v!==null&&v>0&&v<120);
-    return ages.length?Math.round(ages.reduce((s,v)=>s+v,0)/ages.length*10)/10:0;
-  }
   if(aggr==='min') return Math.min(...nums);
   if(aggr==='max') return Math.max(...nums);
   if(aggr==='std'){const m=nums.reduce((s,v)=>s+v,0)/nums.length;return Math.sqrt(nums.reduce((s,v)=>s+(v-m)**2,0)/nums.length);}
@@ -3405,7 +3405,13 @@ function buildAggrGrid(containerId, selAggr, varName){
     btn.className='aggr-btn'+(a.id===selAggr?' selected':'');
     btn.textContent=a.label;
     btn.onclick=function(){
-      window[varName]=a.id;
+      // NB: surtout pas window[varName]=… — modalSelAggr & co sont des `let` de
+      // portée script, une propriété window homonyme ne les mettrait PAS à jour
+      // (le type de calcul resterait bloqué sur sa valeur d'ouverture).
+      if(varName==='modalSelAggr') modalSelAggr=a.id;
+      else if(varName==='modalSelKpiAggr') modalSelKpiAggr=a.id;
+      else if(varName==='modalSelGaugeAggr') modalSelGaugeAggr=a.id;
+      else window[varName]=a.id;
       el.querySelectorAll('.aggr-btn').forEach(b=>b.classList.remove('selected'));
       this.classList.add('selected');
     };
