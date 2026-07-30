@@ -935,7 +935,23 @@ function fpgeoInjectCSS(){
     '.fpgeo-tip-nodata{font-size:10px;color:rgba(255,255,255,.65);margin-top:2px}',
     ".fpgeo-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8ca0b3;font-size:11px;font-family:'DM Sans',Arial,sans-serif;gap:8px}",
     '.fpgeo-load::before{content:"";width:14px;height:14px;border-radius:99px;border:2px solid #d7e0ea;border-top-color:#4a7fa5;animation:fpgeo-spin .8s linear infinite}',
-    '@keyframes fpgeo-spin{to{transform:rotate(360deg)}}'
+    '@keyframes fpgeo-spin{to{transform:rotate(360deg)}}',
+    '.fpgeo-hole{fill:rgba(255,255,255,.94)}',
+    '/* ── mode sombre ── */',
+    'body.fp-dark .fpgeo-stage{background:radial-gradient(130% 100% at 28% 8%,rgba(120,160,210,.10) 0%,rgba(0,0,0,0) 55%),linear-gradient(160deg,#101b2b 0%,#0d1724 55%,#0a1320 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}',
+    'body.fp-dark .fpgeo-land{stroke:#3e5471}',
+    'body.fp-dark .fpgeo-region{fill:#243144;stroke:#4c637f}',
+    'body.fp-dark .fpgeo-region:hover{filter:brightness(1.15)}',
+    'body.fp-dark .fpgeo-c{stroke:#1b2735}',
+    'body.fp-dark .fpgeo-lbl-name{fill:#e8eef6;stroke:rgba(10,16,26,.85)}',
+    'body.fp-dark .fpgeo-lbl-val{fill:#ffffff;stroke:rgba(10,16,26,.9)}',
+    'body.fp-dark .fpgeo-ptlbl-name{fill:#dce6f2;stroke:rgba(10,16,26,.85)}',
+    'body.fp-dark .fpgeo-ptlbl-vald{fill:#e8eef6}',
+    'body.fp-dark .fpgeo-hole{fill:rgba(21,30,42,.94)}',
+    'body.fp-dark .fpgeo-btn{background:rgba(21,31,44,.92);color:#c6d4e4;border-color:rgba(255,255,255,.1)}',
+    'body.fp-dark .fpgeo-btn:hover{background:#1c2938}',
+    'body.fp-dark .fpgeo-load{color:#7288a0}',
+    'body.fp-dark .fpgeo-load::before{border-color:#2c3e55;border-top-color:#7fa5c8}'
   ].join('\n');
   document.head.appendChild(st);
 }
@@ -1166,7 +1182,8 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   // ---- fond (contexte monde + découpage du pays) + couches de données ----
   const entryByFeature=isChoro?new Map(geo.entries.map(function(e){return [e.feature,e];})):null;
   const dataShapes=[];
-  const LAND_TINTS=["#eef0f3","#e4e8ed","#dae0e8"];
+  const fpDark=!!(document.body&&document.body.classList&&document.body.classList.contains("fp-dark"));
+  const LAND_TINTS=fpDark?["#222f3f","#1e2a39","#1a2533"]:["#eef0f3","#e4e8ed","#dae0e8"];
   ctxFs.forEach(function(f,i){
     const d=buildPath(f,fit.s,fit.tx,fit.ty);
     if(!d) return;
@@ -1292,7 +1309,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
           });
           const hole=document.createElementNS(NS,"circle");
           hole.setAttribute("r",(r*0.42).toFixed(1));
-          hole.setAttribute("fill","rgba(255,255,255,.94)");
+          hole.setAttribute("class","fpgeo-hole");
           bub.appendChild(hole);
         }
       }

@@ -152,7 +152,7 @@ export function renderDonut(w, elId, rawLabels, rawValues, chartInstances, fmtNu
       'top:' + legY + '%',
       'width:' + legW + 'px',
       (legH ? 'height:' + legH + 'px' : 'max-height:80%'),
-      'background:rgba(255,255,255,0.92)',
+      'background:'+(document.body&&document.body.classList.contains('fp-dark')?'rgba(21,31,44,0.92)':'rgba(255,255,255,0.92)'),
       'backdrop-filter:blur(4px)',
       'border:1px solid #e2e8f0',
       'border-radius:10px',
@@ -179,7 +179,7 @@ export function renderDonut(w, elId, rawLabels, rawValues, chartInstances, fmtNu
       row.style.cssText = 'display:flex;align-items:center;gap:6px;min-width:0';
       row.innerHTML =
         '<div style="width:10px;height:10px;border-radius:3px;flex-shrink:0;background:' + bgColors[i] + '"></div>'
-        + '<div style="font-size:12px;color:#1a2733;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + l + '">' + l + '</div>'
+        + '<div style="font-size:12px;color:var(--dark,#1a2733);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + l + '">' + l + '</div>'
         + '<div style="font-size:11px;font-weight:700;color:#607287;flex-shrink:0;margin-left:4px">' + legTxt + '</div>';
       leg.appendChild(row);
     });

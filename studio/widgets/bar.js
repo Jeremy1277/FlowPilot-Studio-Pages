@@ -236,7 +236,7 @@ export function renderBar(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
         },
         y: {
           stacked: isStacked,
-          grid: { color: '#f0f3f7', display: !isHorizontal },
+          grid: { color: (window.FP_THEME&&window.FP_THEME.grid)||'#f0f3f7', display: !isHorizontal },
           ticks: {
             font: { size: 9 },
             callback: function(v) {
