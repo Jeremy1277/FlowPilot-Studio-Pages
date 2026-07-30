@@ -2187,13 +2187,86 @@ function handleFile(file){
   reader.onload=e=>{
     try{
       const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const parsed=XLSX.utils.sheet_to_json(ws,{defval:''});
-      if(!parsed.length){toast(window.FP_t?window.FP_t('toast_empty_file'):'⚠ Fichier vide');return;}
-      loadData(parsed,file.name);
+      // Inventaire des feuilles : lignes, colonnes, premiers en-têtes
+      const sheets=wb.SheetNames.map(n=>{
+        const ws=wb.Sheets[n];
+        const ref=ws&&ws['!ref'];
+        let nRows=0,nCols=0,heads=[];
+        if(ref){
+          try{
+            const r=XLSX.utils.decode_range(ref);
+            nRows=Math.max(0,r.e.r-r.s.r);
+            nCols=r.e.c-r.s.c+1;
+            const headRange=XLSX.utils.encode_range({s:{r:r.s.r,c:r.s.c},e:{r:r.s.r,c:Math.min(r.e.c,r.s.c+11)}});
+            const first=XLSX.utils.sheet_to_json(ws,{header:1,range:headRange,defval:''})[0]||[];
+            heads=first.map(h=>String(h).trim()).filter(h=>h!=='');
+          }catch(e2){}
+        }
+        return {name:n,rows:nRows,cols:nCols,heads};
+      });
+      const usable=sheets.filter(sh=>sh.rows>0);
+      if(usable.length===0){toast(window.FP_t?window.FP_t('toast_empty_file'):'⚠ Fichier vide');return;}
+      if(usable.length===1){
+        loadSheetFromWorkbook(wb,usable[0].name,file.name,false);
+      }else{
+        showSheetPicker(file.name,wb,sheets);
+      }
     }catch(err){toast('⚠ Erreur: '+err.message);}
   };
   reader.readAsArrayBuffer(file);
+}
+
+function loadSheetFromWorkbook(wb,sheetName,fileName,showSheetInName){
+  const ws=wb.Sheets[sheetName];
+  const parsed=XLSX.utils.sheet_to_json(ws,{defval:''});
+  if(!parsed.length){toast(window.FP_t?window.FP_t('toast_empty_file'):'⚠ Feuille vide');return;}
+  loadData(parsed,showSheetInName?fileName+' — '+sheetName:fileName);
+}
+
+// Classeur multi-feuilles : choix de la feuille à analyser
+function showSheetPicker(fileName,wb,sheets){
+  const prev=document.getElementById('sheet-picker-overlay');
+  if(prev) prev.remove();
+  const ov=document.createElement('div');
+  ov.id='sheet-picker-overlay';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(13,27,42,.55);backdrop-filter:blur(3px);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px';
+  const cards=sheets.map((sh,i)=>{
+    const empty=sh.rows===0;
+    const headsTxt=sh.heads.length?sh.heads.slice(0,5).join(', ')+(sh.heads.length>5?'…':''):'';
+    return '<button type="button" class="fp-sheet-card" data-sheet="'+i+'" '+(empty?'disabled':'')+' style="width:100%;text-align:left;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:'+(empty?'#f6f8fa':'linear-gradient(180deg,#ffffff,#f7fafd)')+';cursor:'+(empty?'default':'pointer')+';font-family:inherit;'+(empty?'opacity:.55;':'')+'box-shadow:0 1px 3px rgba(13,27,42,.07);transition:transform .12s ease,box-shadow .15s ease,border-color .12s ease">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+      +'<span style="font-weight:800;font-size:14px;color:var(--dark)">📄 '+esc(sh.name)+'</span>'
+      +'<span style="font-size:11px;color:var(--muted);white-space:nowrap">'+(empty?'vide':sh.rows.toLocaleString('fr-FR')+' lignes · '+sh.cols+' col.')+'</span>'
+      +'</div>'
+      +(headsTxt?'<div style="font-size:11px;color:var(--mid);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(headsTxt)+'</div>':'')
+      +'</button>';
+  }).join('');
+  ov.innerHTML='<div style="background:#fff;border-radius:18px;max-width:560px;width:100%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(13,27,42,.4)">'
+    +'<div style="background:var(--navy);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px">'
+    +'<div><div style="font-family:Barlow Condensed,sans-serif;font-weight:800;font-size:19px">📑 Choisis la feuille à analyser</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.55);margin-top:2px;overflow:hidden;text-overflow:ellipsis;max-width:420px">'+esc(fileName)+' · '+sheets.length+' feuilles</div></div>'
+    +'<button type="button" id="sheet-picker-close" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:22px;cursor:pointer;line-height:1;padding:4px">×</button>'
+    +'</div>'
+    +'<div style="padding:16px 20px;display:flex;flex-direction:column;gap:8px;overflow:auto">'+cards+'</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{
+    if(e.target===ov||e.target.id==='sheet-picker-close'){ov.remove();return;}
+    const card=e.target.closest('.fp-sheet-card');
+    if(card&&!card.disabled){
+      const sh=sheets[parseInt(card.dataset.sheet,10)];
+      ov.remove();
+      loadSheetFromWorkbook(wb,sh.name,fileName,true);
+    }
+  });
+  ov.addEventListener('mouseover',e=>{
+    const card=e.target.closest('.fp-sheet-card');
+    if(card&&!card.disabled){card.style.transform='translateY(-1px)';card.style.borderColor='var(--accent)';card.style.boxShadow='0 4px 12px rgba(13,27,42,.14)';}
+  });
+  ov.addEventListener('mouseout',e=>{
+    const card=e.target.closest('.fp-sheet-card');
+    if(card){card.style.transform='';card.style.borderColor='var(--border)';card.style.boxShadow='0 1px 3px rgba(13,27,42,.07)';}
+  });
 }
 function loadData(data,name){
   clearAggregationCache();
