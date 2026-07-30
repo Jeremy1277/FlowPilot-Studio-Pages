@@ -958,6 +958,53 @@ body.fp-dark .step-btn.active{background:var(--accent);color:#0d1b2a}
 body.fp-dark .toast{background:#1a2534;color:var(--dark);border:1px solid var(--border)}
 body.fp-dark .aggr-btn.selected,body.fp-dark .ct-btn.selected{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
 body.fp-dark .wp-btn,body.fp-dark .demo-btn{box-shadow:0 2px 6px rgba(0,0,0,.3)}
+
+/* ══════════ COQUES SUPPLÉMENTAIRES (base sombre = classe fp-dark en plus) ══════════ */
+/* ⚡ Fluo — néon électrique sur noir */
+body.fp-theme-fluo{
+  --bg:#07070d;--card:#101018;--card2:#16161f;--border:#262637;
+  --dark:#eafaea;--mid:#9fe8a8;--muted:#5f7a66;
+  --navy:#050509;--navy2:#0c0c14;
+  --accent:#39FF14;--accent2:#7dff5e;--accent-soft:rgba(57,255,20,.14);
+  --glass:rgba(16,16,24,.72);--glass-border:rgba(57,255,20,.25);
+}
+body.fp-theme-fluo .brand-logo{box-shadow:0 0 18px rgba(57,255,20,.5)}
+body.fp-theme-fluo .btn-primary,body.fp-theme-fluo .step-btn.active{box-shadow:0 0 14px rgba(57,255,20,.45)}
+
+/* 🌴 Miami Vice — rose néon & turquoise sur nuit violette */
+body.fp-theme-miami{
+  --bg:#120a24;--card:#1b1035;--card2:#221543;--border:#3a2566;
+  --dark:#f4e9ff;--mid:#c2a8e8;--muted:#8a6fb8;
+  --navy:#0c0618;--navy2:#160c2c;
+  --accent:#ff2d95;--accent2:#ff5fb0;--accent-soft:rgba(255,45,149,.16);
+  --green:#00d4d4;--green-soft:rgba(0,212,212,.16);
+  --glass:rgba(27,16,53,.72);--glass-border:rgba(255,45,149,.28);
+}
+body.fp-theme-miami .brand-logo{box-shadow:0 0 18px rgba(255,45,149,.5)}
+body.fp-theme-miami .btn-primary,body.fp-theme-miami .step-btn.active{box-shadow:0 0 14px rgba(255,45,149,.4)}
+
+/* 🕺 70's — chaleur seventies, base claire */
+body.fp-theme-seventies{
+  --bg:#f3ead8;--card:#fbf4e4;--card2:#f5ecd6;--border:#e2cfae;
+  --dark:#41301e;--mid:#7d6547;--muted:#a08a68;
+  --navy:#3a2a18;--navy2:#4a3826;
+  --accent:#d97f26;--accent2:#e59a48;--accent-soft:rgba(217,127,38,.16);
+  --green:#7a8c3f;--green-soft:rgba(122,140,63,.18);--coral:#b6452c;
+  --glass:rgba(251,244,228,.75);--glass-border:rgba(190,155,105,.5);
+}
+body.fp-theme-seventies #topbar{background:#f7efdd}
+
+/* 📈 Wall Street 80's — costume rayé, or et vert terminal */
+body.fp-theme-wallstreet{
+  --bg:#0a0e0c;--card:#111814;--card2:#16201a;--border:#26382d;
+  --dark:#e9f2ea;--mid:#9fb8a6;--muted:#688a72;
+  --navy:#060a08;--navy2:#0d1310;
+  --accent:#d4af37;--accent2:#e3c35c;--accent-soft:rgba(212,175,55,.15);
+  --green:#00c853;--green-soft:rgba(0,200,83,.15);
+  --glass:rgba(17,24,20,.72);--glass-border:rgba(212,175,55,.3);
+}
+body.fp-theme-wallstreet .brand-logo{box-shadow:0 0 14px rgba(212,175,55,.4)}
+
 </style>
 <body>
 <div id="intro-screen" aria-label="Chargement FlowPilot Studio" onclick="skipIntroSplash()">
@@ -1749,26 +1796,65 @@ const BUSINESS_RULES=[
 
 let chartInstances={};
 
-// ── THÈME CLAIR / SOMBRE ─────────────────────────────────────────────────
+// ── THÈMES (moteur + coques) ─────────────────────────────────────────────
+// Une coque = un jeu de variables CSS. base:'dark' ajoute la classe fp-dark
+// (graphiques, carte et champs passent en rendu nuit automatiquement).
+const FP_SKINS=[
+  {id:'light',      label:'Clair',            icon:'☀️', base:'light', cls:null,                  grid:'#f0f3f7', chartText:'#666'},
+  {id:'dark',       label:'Sombre',           icon:'🌙', base:'dark',  cls:null,                  grid:'#233245', chartText:'#9db0c5'},
+  {id:'fluo',       label:'Fluo',             icon:'⚡', base:'dark',  cls:'fp-theme-fluo',       grid:'#1d2a1d', chartText:'#9fe8a8'},
+  {id:'miami',      label:'Miami Vice',       icon:'🌴', base:'dark',  cls:'fp-theme-miami',      grid:'#2c1d4e', chartText:'#c2a8e8'},
+  {id:'seventies',  label:"70's",             icon:'🕺', base:'light', cls:'fp-theme-seventies',  grid:'#e8d9bc', chartText:'#7d6547'},
+  {id:'wallstreet', label:"Wall Street 80's", icon:'📈', base:'dark',  cls:'fp-theme-wallstreet', grid:'#1e2c23', chartText:'#9fb8a6'},
+];
 const FP_THEME={grid:'#f0f3f7',text:'#1a2733',halo:'rgba(255,255,255,.92)'};
 window.FP_THEME=FP_THEME; // exposé aux modules (bar.js…) — const de script ≠ propriété window
 function fpApplyTheme(mode){
-  const dark=mode==='dark';
+  const skin=FP_SKINS.find(t=>t.id===mode)||FP_SKINS[0];
+  const dark=skin.base==='dark';
+  FP_SKINS.forEach(t=>{ if(t.cls) document.body.classList.remove(t.cls); });
   document.body.classList.toggle('fp-dark',dark);
-  try{localStorage.setItem('fpTheme',mode);}catch(e){}
-  FP_THEME.grid=dark?'#233245':'#f0f3f7';
+  if(skin.cls) document.body.classList.add(skin.cls);
+  try{localStorage.setItem('fpTheme',skin.id);}catch(e){}
+  FP_THEME.grid=skin.grid;
   FP_THEME.text=dark?'#dfe8f2':'#1a2733';
   FP_THEME.halo=dark?'rgba(13,20,30,.85)':'rgba(255,255,255,.92)';
   if(window.Chart){
-    Chart.defaults.color=dark?'#9db0c5':'#666';
+    Chart.defaults.color=skin.chartText;
     Chart.defaults.borderColor=FP_THEME.grid;
   }
   const b=document.getElementById('fp-theme-toggle');
-  if(b){ b.textContent=dark?'☀️':'🌙'; b.title=dark?'Mode clair':'Mode sombre'; }
+  if(b){ b.textContent=skin.icon; b.title='Thème : '+skin.label; }
+  const menu=document.getElementById('fp-theme-menu');
+  if(menu) menu.querySelectorAll('[data-skin]').forEach(x=>x.classList.toggle('sel',x.dataset.skin===skin.id));
   try{ if(typeof renderWidgets==='function'&&Array.isArray(rows)&&rows.length) renderWidgets(); }catch(e){}
   try{ if(typeof refreshPreview==='function'&&currentStep===4) refreshPreview(); }catch(e){}
 }
-function fpToggleTheme(){ fpApplyTheme(document.body.classList.contains('fp-dark')?'light':'dark'); }
+function fpToggleTheme(){ // clic simple : bascule clair/sombre ; le menu offre le reste
+  fpApplyTheme(document.body.classList.contains('fp-dark')?'light':'dark');
+}
+function fpToggleThemeMenu(ev){
+  if(ev) ev.stopPropagation();
+  let menu=document.getElementById('fp-theme-menu');
+  if(menu){ menu.remove(); return; }
+  const cur=(localStorage.getItem('fpTheme')||'light');
+  menu=document.createElement('div');
+  menu.id='fp-theme-menu';
+  menu.style.cssText='position:fixed;top:52px;right:170px;z-index:900;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.35);padding:6px;min-width:190px';
+  menu.innerHTML=FP_SKINS.map(t=>{
+    return '<button type="button" data-skin="'+t.id+'" class="'+(t.id===cur?'sel':'')+'" '
+      +'style="display:flex;align-items:center;gap:9px;width:100%;border:none;background:'+(t.id===cur?'var(--accent-soft)':'transparent')+';border-radius:8px;padding:8px 10px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--dark);text-align:left">'
+      +'<span style="font-size:14px">'+t.icon+'</span>'+t.label
+      +(t.id===cur?'<span style="margin-left:auto;color:var(--accent)">✓</span>':'')
+      +'</button>';
+  }).join('');
+  document.body.appendChild(menu);
+  menu.addEventListener('click',function(e){
+    const b=e.target.closest('[data-skin]');
+    if(b){ fpApplyTheme(b.dataset.skin); menu.remove(); }
+  });
+  setTimeout(()=>document.addEventListener('click',function close(){ menu.remove(); document.removeEventListener('click',close); }),0);
+}
 
 // ── PERFORMANCE & AFFICHAGE DES VALEURS ──────────────────────────────────
 // Cache d'agrégation par jeu de données : évite de recalculer les mêmes sommes
@@ -10650,7 +10736,7 @@ document.addEventListener('fp-lang-changed', function(){
     btn.textContent='🌙';
     btn.title='Mode sombre';
     btn.style.cssText='padding:7px 10px;font-size:14px;line-height:1';
-    btn.onclick=function(){ fpToggleTheme(); };
+    btn.onclick=function(ev){ fpToggleThemeMenu(ev); };
     target.insertBefore(btn, target.firstChild);
   }
   let saved=null;
