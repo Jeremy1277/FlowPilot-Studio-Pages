@@ -1,6 +1,9 @@
 /**
  * FlowPilot Studio — Widget Carte géographique (geo.js)
- * Choropleth basé sur chartjs-chart-geo (MIT, sgratzl) + world-atlas (MIT).
+ * Choroplèthe SVG maison : projection Mercator, zoom cinématique à l'ouverture,
+ * survol + tooltip, zoom molette / double-clic / boutons, déplacement à la souris.
+ * Fond de carte : world-atlas (MIT) ; window.ChartGeo.topojson (déjà chargé par
+ * l'app) ne sert plus qu'à convertir le TopoJSON en GeoJSON.
  * Reconnaît les valeurs de la colonne "pays" sous forme de code ISO-2 (FR, DE, LU…),
  * de nom anglais officiel ou d'un alias français courant, puis les projette sur une carte.
  *
@@ -385,13 +388,149 @@ function gradientShade(baseHex,t){
 
 const GEO_NODATA_COLOR="#e7ecf2";
 
+/* ============================================================================
+ * Moteur de rendu SVG — carte choroplèthe dynamique FlowPilot
+ * Zoom cinématique à l'ouverture, survol + tooltip, zoom molette / pan / boutons.
+ * chartjs-chart-geo n'est plus utilisé que pour la conversion TopoJSON→GeoJSON
+ * (window.ChartGeo.topojson), déjà chargée par l'app.
+ * ========================================================================= */
+
+const D2R=Math.PI/180;
+function projX(lon){ return lon*D2R; }
+function projY(lat){ const l=Math.max(-84,Math.min(84,lat))*D2R; return -Math.log(Math.tan(Math.PI/4+l/2)); }
+
+function featureRings(f){
+  const g=f&&f.geometry; if(!g) return [];
+  if(g.type==="Polygon") return g.coordinates;
+  if(g.type==="MultiPolygon"){
+    const out=[]; g.coordinates.forEach(function(p){ p.forEach(function(r){ out.push(r); }); });
+    return out;
+  }
+  return [];
+}
+
+// Bornes en coordonnées Mercator, avec fenêtre de clip [lonMin,latMin,lonMax,latMax]
+// (permet d'ignorer les territoires lointains : Guyane pour FR, Svalbard pour NO…)
+function mercBounds(features, clip){
+  let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity,found=false;
+  features.forEach(function(f){
+    featureRings(f).forEach(function(ring){
+      ring.forEach(function(pt){
+        const lon=pt[0],lat=pt[1];
+        if(clip&&(lon<clip[0]||lat<clip[1]||lon>clip[2]||lat>clip[3])) return;
+        const x=projX(lon),y=projY(lat);
+        if(x<x0)x0=x; if(y<y0)y0=y; if(x>x1)x1=x; if(y>y1)y1=y;
+        found=true;
+      });
+    });
+  });
+  if(!found) return mercBounds(features,null);
+  return [x0,y0,x1,y1];
+}
+
+function expandBounds(b,f){
+  const dx=(b[2]-b[0])*f, dy=(b[3]-b[1])*f;
+  return [b[0]-dx,b[1]-dy,b[2]+dx,b[3]+dy];
+}
+function ensureSpan(b,minX,minY){
+  let [x0,y0,x1,y1]=b;
+  if(x1-x0<minX){ const c=(x0+x1)/2; x0=c-minX/2; x1=c+minX/2; }
+  if(y1-y0<minY){ const c=(y0+y1)/2; y0=c-minY/2; y1=c+minY/2; }
+  return [x0,y0,x1,y1];
+}
+function fitTransform(b,w,h,pad){
+  const dx=b[2]-b[0]||1e-9, dy=b[3]-b[1]||1e-9;
+  const s=Math.min((w-pad*2)/dx,(h-pad*2)/dy);
+  return { s:s, tx:(w-s*(b[0]+b[2]))/2, ty:(h-s*(b[1]+b[3]))/2 };
+}
+
+// Chemin SVG « cuit » dans le repère écran du cadrage de base
+function buildPath(f,s,tx,ty){
+  let d="";
+  featureRings(f).forEach(function(ring){
+    for(let i=0;i<ring.length;i++){
+      const x=(projX(ring[i][0])*s+tx).toFixed(2);
+      const y=(projY(ring[i][1])*s+ty).toFixed(2);
+      d+=(i===0?"M":"L")+x+","+y;
+    }
+    d+="Z";
+  });
+  return d;
+}
+
+// Centroïde + bbox du plus grand anneau (écran) : évite que la Guyane ne
+// déplace le label « France », que le Svalbard ne déplace « Norvège », etc.
+function largestRingInfo(f,s,tx,ty){
+  let best=null,bestArea=0;
+  featureRings(f).forEach(function(ring){
+    let a=0,cx=0,cy=0,minx=Infinity,miny=Infinity,maxx=-Infinity,maxy=-Infinity;
+    const pts=ring.map(function(pt){
+      const x=projX(pt[0])*s+tx, y=projY(pt[1])*s+ty;
+      if(x<minx)minx=x; if(y<miny)miny=y; if(x>maxx)maxx=x; if(y>maxy)maxy=y;
+      return [x,y];
+    });
+    for(let i=0,n=pts.length;i<n;i++){
+      const p=pts[i],q=pts[(i+1)%n];
+      const cross=p[0]*q[1]-q[0]*p[1];
+      a+=cross; cx+=(p[0]+q[0])*cross; cy+=(p[1]+q[1])*cross;
+    }
+    a/=2;
+    const absA=Math.abs(a);
+    if(absA>bestArea&&absA>1e-6){
+      bestArea=absA;
+      best={cx:cx/(6*a),cy:cy/(6*a),bw:maxx-minx,bh:maxy-miny};
+    }
+  });
+  return best;
+}
+
+function easeInOutCubic(t){ return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2; }
+function easeOutCubic(t){ return 1-Math.pow(1-t,3); }
+
+function fpgeoInjectCSS(){
+  if(document.getElementById("fpgeo-style")) return;
+  const st=document.createElement("style");
+  st.id="fpgeo-style";
+  st.textContent=[
+    '.fpgeo-stage{position:relative;flex:1;min-height:110px;overflow:hidden;border-radius:12px;cursor:grab;',
+    ' background:radial-gradient(130% 100% at 28% 8%,#ffffff 0%,rgba(255,255,255,0) 52%),linear-gradient(160deg,#f5f9fd 0%,#e9eff7 58%,#e2eaf4 100%);',
+    ' box-shadow:inset 0 0 0 1px rgba(13,27,42,.05)}',
+    '.fpgeo-stage.fpgeo-drag{cursor:grabbing}',
+    '.fpgeo-svg{position:absolute;inset:0;width:100%;height:100%;display:block}',
+    '.fpgeo-land{fill:#e4eaf2;stroke:#fff;stroke-width:.7;vector-effect:non-scaling-stroke}',
+    '.fpgeo-c{stroke:#fff;stroke-width:1;vector-effect:non-scaling-stroke;cursor:pointer;transition:filter .18s ease,opacity .5s ease}',
+    '.fpgeo-data.fpgeo-hovering .fpgeo-c:not(.fpgeo-hover){opacity:.72}',
+    '.fpgeo-c.fpgeo-hover{filter:brightness(1.1) saturate(1.08);stroke-width:1.8}',
+    '.fpgeo-lblg{pointer-events:none;transition:opacity .45s ease}',
+    ".fpgeo-lbl-name{font-family:'DM Sans',Arial,sans-serif;font-weight:700;fill:#132A3A;paint-order:stroke;stroke:rgba(255,255,255,.88);stroke-width:3px;stroke-linejoin:round}",
+    ".fpgeo-lbl-val{font-family:'Barlow Condensed','DM Sans',Arial,sans-serif;font-weight:800;fill:#0D1B2A;paint-order:stroke;stroke:rgba(255,255,255,.92);stroke-width:3.4px;stroke-linejoin:round;letter-spacing:.02em}",
+    '.fpgeo-ctrls{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;opacity:0;transition:opacity .25s ease;z-index:3}',
+    '.fpgeo-stage:hover .fpgeo-ctrls{opacity:1}',
+    '.fpgeo-btn{width:26px;height:26px;border-radius:8px;border:1px solid rgba(13,27,42,.08);background:rgba(255,255,255,.92);backdrop-filter:blur(4px);color:#31465c;font-size:14px;font-weight:700;line-height:1;display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(13,27,42,.10);transition:background .15s,transform .12s;padding:0}',
+    '.fpgeo-btn:hover{background:#fff;transform:translateY(-1px)}',
+    '.fpgeo-btn:active{transform:translateY(0) scale(.96)}',
+    ".fpgeo-tip{position:absolute;pointer-events:none;z-index:4;min-width:110px;max-width:220px;background:rgba(13,27,42,.94);color:#fff;border-radius:10px;padding:8px 11px;font-family:'DM Sans',Arial,sans-serif;opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;box-shadow:0 8px 22px rgba(13,27,42,.35)}",
+    '.fpgeo-tip.fpgeo-tip-on{opacity:1;transform:translateY(0)}',
+    '.fpgeo-tip-name{font-size:11px;font-weight:700;letter-spacing:.02em;display:flex;align-items:center;gap:6px}',
+    '.fpgeo-tip-dot{width:8px;height:8px;border-radius:99px;flex:none;box-shadow:0 0 0 2px rgba(255,255,255,.18)}',
+    ".fpgeo-tip-val{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;margin-top:2px;line-height:1.05}",
+    '.fpgeo-tip-sub{font-size:9.5px;color:rgba(255,255,255,.62);margin-top:3px}',
+    '.fpgeo-tip-nodata{font-size:10px;color:rgba(255,255,255,.65);margin-top:2px}',
+    ".fpgeo-load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8ca0b3;font-size:11px;font-family:'DM Sans',Arial,sans-serif;gap:8px}",
+    '.fpgeo-load::before{content:"";width:14px;height:14px;border-radius:99px;border:2px solid #d7e0ea;border-top-color:#4a7fa5;animation:fpgeo-spin .8s linear infinite}',
+    '@keyframes fpgeo-spin{to{transform:rotate(360deg)}}'
+  ].join('\n');
+  document.head.appendChild(st);
+}
+
 export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum, canvasId){
   const el=document.getElementById(elId);
   if(!el) return;
   if(!canvasId) canvasId="cvg"+w.id.replace(/[^a-zA-Z0-9]/g,"");
+  fpgeoInjectCSS();
 
   if(!w.col){
-    el.innerHTML='<div class="wc-empty"><div class="we-icon">\uD83C\uDF0D</div><div>Sélectionne une colonne pays</div></div>';
+    el.innerHTML='<div class="wc-empty"><div class="we-icon">🌍</div><div>Sélectionne une colonne pays</div></div>';
     return;
   }
   if(typeof window.ChartGeo==="undefined"){
@@ -399,161 +538,346 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
     return;
   }
 
+  if(chartInstances[canvasId]){ try{ chartInstances[canvasId].destroy(); }catch(e){} delete chartInstances[canvasId]; }
+
   el.innerHTML='<div class="geo-wrap" style="display:flex;flex-direction:column;height:100%;gap:4px">'
-    +'<div class="chart-wrap" style="flex:1;min-height:110px;position:relative;overflow:hidden"><canvas id="'+canvasId+'" style="transform:scale(1.3);transform-origin:center center"></canvas></div>'
+    +'<div class="fpgeo-stage" id="'+canvasId+'-stage"><div class="fpgeo-load">Chargement de la carte…</div></div>'
     +'<div class="geo-legend" id="'+canvasId+'-legend" style="display:flex;align-items:center;gap:6px;font-size:9px;color:var(--muted,#8ca0b3);padding:0 4px"></div>'
     +'<div class="geo-warn" id="'+canvasId+'-warn" style="font-size:9px;color:#D85A30;padding:0 4px;display:none"></div>'
     +'</div>';
 
   loadWorldFeatures().then(function(features){
-    renderGeoChart(w, el, canvasId, rawLabels, rawValues, chartInstances, fmtNum, features);
+    buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fmtNum, features, 0, false);
   }).catch(function(){
     el.innerHTML='<div class="wc-empty"><div class="we-icon">⚠️</div><div>Impossible de charger le fond de carte</div></div>';
   });
 }
 
-function renderGeoChart(w, el, canvasId, rawLabels, rawValues, chartInstances, fmtNum, features){
-  const canvas=document.getElementById(canvasId);
-  if(!canvas) return; // le widget a pu être retiré entre-temps
+function buildGeoScene(w, el, canvasId, rawLabels, rawValues, chartInstances, fmtNum, features, attempt, skipIntro){
+  const stage=document.getElementById(canvasId+"-stage");
+  if(!stage) return;
+  const W=stage.clientWidth, H=stage.clientHeight;
+  if((W<40||H<40)&&attempt<12){
+    requestAnimationFrame(function(){ buildGeoScene(w,el,canvasId,rawLabels,rawValues,chartInstances,fmtNum,features,attempt+1,skipIntro); });
+    return;
+  }
 
-  // Construire la correspondance alpha2 -> {rawLabel, value}
+  // ---- correspondance pays -> valeur -------------------------------------
   const byA2={}; const unmatched=[];
   rawLabels.forEach(function(lbl,i){
     const a2=toAlpha2(lbl);
     if(a2) byA2[a2]={label:lbl,value:rawValues[i]};
-    else if(lbl!=null && String(lbl).trim()!=="") unmatched.push(String(lbl));
+    else if(lbl!=null&&String(lbl).trim()!=="") unmatched.push(String(lbl));
   });
-
   const matchedA2=Object.keys(byA2);
   if(!matchedA2.length){
-    el.innerHTML='<div class="wc-empty"><div class="we-icon">\uD83C\uDF0D</div><div>Aucun pays reconnu dans cette colonne</div></div>';
+    el.innerHTML='<div class="wc-empty"><div class="we-icon">🌍</div><div>Aucun pays reconnu dans cette colonne</div></div>';
     return;
   }
 
-  // Cadrage : auto détecte Europe si 100% des pays reconnus y sont, sinon Monde
   let scope=w.geoScope||"auto";
   if(scope==="auto") scope=matchedA2.every(function(a2){return EUROPE_A2.has(a2);})?"europe":"world";
 
-  const featureSet=scope==="europe"
-    ? features.filter(function(f){ const a2=NUM_TO_A2[String(f.id)]; return a2 && EUROPE_A2.has(a2); })
-    : features;
+  let featureSet=scope==="europe"
+    ? features.filter(function(f){ const a2=NUM_TO_A2[String(f.id)]; return a2&&EUROPE_A2.has(a2); })
+    : features.filter(function(f){ return NUM_TO_A2[String(f.id)]!=="AQ"; }); // pas d'Antarctique
 
   const values=matchedA2.map(function(a2){return byA2[a2].value;});
   const vmin=Math.min.apply(null,values), vmax=Math.max.apply(null,values);
+  let total=0; values.forEach(function(v){ total+=(+v||0); });
+  const sortedA2=matchedA2.slice().sort(function(a,b){return byA2[b].value-byA2[a].value;});
+  const rankOf={}; sortedA2.forEach(function(a2,i){ rankOf[a2]=i+1; });
   const baseColor=(w.color&&w.color[0]==="#")?w.color:"#4a7fa5";
 
-  const dataPoints=[]; const bgColors=[]; const chartLabels=[];
+  // ---- cadrage : zoom auto sur la zone des données -----------------------
+  const clip=scope==="europe"?[-25,34,35,72]:[-179.9,-56,179.9,84];
+  const fullB=mercBounds(featureSet,clip);
+  const dataFeats=featureSet.filter(function(f){ return !!byA2[NUM_TO_A2[String(f.id)]]; });
+  let dataB=mercBounds(dataFeats.length?dataFeats:featureSet,clip);
+  dataB=expandBounds(dataB,0.14);
+  dataB=ensureSpan(dataB,(fullB[2]-fullB[0])*0.22,(fullB[3]-fullB[1])*0.22);
+  const fit=fitTransform(dataB,W,H,8);
+  const fitAll=fitTransform(expandBounds(fullB,0.03),W,H,8);
+
+  // ---- construction du SVG ----------------------------------------------
+  const NS="http://www.w3.org/2000/svg";
+  stage.innerHTML="";
+  const svg=document.createElementNS(NS,"svg");
+  svg.setAttribute("class","fpgeo-svg");
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+
+  const defs=document.createElementNS(NS,"defs");
+  const filt=document.createElementNS(NS,"filter");
+  filt.setAttribute("id",canvasId+"-sh");
+  filt.setAttribute("x","-20%");filt.setAttribute("y","-20%");
+  filt.setAttribute("width","140%");filt.setAttribute("height","140%");
+  const fds=document.createElementNS(NS,"feDropShadow");
+  fds.setAttribute("dx","0");fds.setAttribute("dy","1.2");
+  fds.setAttribute("stdDeviation","1.4");
+  fds.setAttribute("flood-color","#0d1b2a");
+  fds.setAttribute("flood-opacity","0.28");
+  filt.appendChild(fds); defs.appendChild(filt); svg.appendChild(defs);
+
+  const gZoom=document.createElementNS(NS,"g");
+  const gLand=document.createElementNS(NS,"g");
+  const gData=document.createElementNS(NS,"g");
+  gData.setAttribute("class","fpgeo-data");
+  gData.setAttribute("filter","url(#"+canvasId+"-sh)");
+  gZoom.appendChild(gLand); gZoom.appendChild(gData);
+  const gLbl=document.createElementNS(NS,"g");
+  svg.appendChild(gZoom); svg.appendChild(gLbl);
+  stage.appendChild(svg);
+
+  // Tooltip + contrôles
+  const tip=document.createElement("div");
+  tip.className="fpgeo-tip";
+  stage.appendChild(tip);
+  const ctrls=document.createElement("div");
+  ctrls.className="fpgeo-ctrls";
+  ctrls.innerHTML='<button class="fpgeo-btn" data-act="in" title="Zoomer" type="button">+</button>'
+    +'<button class="fpgeo-btn" data-act="out" title="Dézoomer" type="button">–</button>'
+    +'<button class="fpgeo-btn" data-act="reset" title="Vue initiale" type="button" style="font-size:12px">⟲</button>';
+  stage.appendChild(ctrls);
+
+  // ---- état zoom/pan ------------------------------------------------------
+  let z={k:1,tx:0,ty:0};
+  let labelsOn=false, dead=false, introRaf=0, zoomRaf=0;
+  const labels=[];
+
+  function applyView(){
+    gZoom.setAttribute("transform","translate("+z.tx+" "+z.ty+") scale("+z.k+")");
+    for(let i=0;i<labels.length;i++){
+      const L=labels[i];
+      L.g.setAttribute("transform","translate("+(L.x*z.k+z.tx)+" "+(L.y*z.k+z.ty)+")");
+      const vis=labelsOn&&L.bw*z.k>=26&&L.bh*z.k>=18;
+      L.g.style.opacity=vis?1:0;
+    }
+  }
+
+  // ---- pays ---------------------------------------------------------------
+  const dataShapes=[];
   featureSet.forEach(function(f){
     const a2=NUM_TO_A2[String(f.id)];
     const m=a2?byA2[a2]:null;
-    dataPoints.push({feature:f, value:m?m.value:null});
+    const d=buildPath(f,fit.s,fit.tx,fit.ty);
+    if(!d) return;
+    const p=document.createElementNS(NS,"path");
+    p.setAttribute("d",d);
     if(m){
       const t=vmax>vmin?(m.value-vmin)/(vmax-vmin):0.7;
-      bgColors.push(gradientShade(baseColor,Math.max(0.12,t)));
-      chartLabels.push(m.label);
+      const fill=gradientShade(baseColor,Math.max(0.12,t));
+      p.setAttribute("class","fpgeo-c");
+      p.setAttribute("fill",fill);
+      gData.appendChild(p);
+      dataShapes.push({p:p,a2:a2,f:f,value:m.value,fill:fill});
     } else {
-      bgColors.push(GEO_NODATA_COLOR);
-      chartLabels.push(null);
+      p.setAttribute("class","fpgeo-land");
+      p.dataset.a2=a2||"";
+      gLand.appendChild(p);
+      bindLandTip(p,a2,f);
     }
   });
 
-  if(chartInstances[canvasId]){ try{ chartInstances[canvasId].destroy(); }catch(e){} }
+  // ---- labels (nom + valeur) ---------------------------------------------
+  dataShapes.sort(function(a,b){return b.value-a.value;});
+  dataShapes.forEach(function(s,i){
+    const lb=largestRingInfo(s.f,fit.s,fit.tx,fit.ty);
+    if(!lb||!isFinite(lb.cx)||!isFinite(lb.cy)) return;
+    const nameSize=Math.max(9,Math.min(14,lb.bw/8));
+    const valSize=nameSize+3;
+    const g=document.createElementNS(NS,"g");
+    g.setAttribute("class","fpgeo-lblg");
+    g.style.opacity=0;
+    g.style.transitionDelay=Math.min(600,i*70)+"ms";
+    const tn=document.createElementNS(NS,"text");
+    tn.setAttribute("class","fpgeo-lbl-name");
+    tn.setAttribute("text-anchor","middle");
+    tn.setAttribute("y",String(-valSize*0.55));
+    tn.setAttribute("font-size",String(nameSize));
+    tn.textContent=displayCountryName(s.a2,s.f);
+    const tv=document.createElementNS(NS,"text");
+    tv.setAttribute("class","fpgeo-lbl-val");
+    tv.setAttribute("text-anchor","middle");
+    tv.setAttribute("y",String(nameSize*0.72));
+    tv.setAttribute("font-size",String(valSize));
+    tv.textContent=fmtNum(s.value);
+    g.appendChild(tn); g.appendChild(tv); gLbl.appendChild(g);
+    labels.push({g:g,x:lb.cx,y:lb.cy,bw:lb.bw,bh:lb.bh});
+  });
 
-  // Plugin: dessine le nom du pays + sa valeur au centre de chaque pays coloré
-  const geoLabelPlugin={
-    id:"geoLabels",
-    afterDatasetsDraw:function(chart){
-      const pScale=chart.scales&&chart.scales.projection;
-      if(!pScale||!pScale.geoPath) return;
-      const ctx=chart.ctx;
-      const ds=chart.data.datasets[0];
-      if(!ds||!ds.data) return;
-      ctx.save();
-      ctx.textAlign="center";
-      ctx.textBaseline="middle";
-      ds.data.forEach(function(dp){
-        if(dp.value==null||!dp.feature) return;
-        const bounds=pScale.geoPath.bounds(dp.feature);
-        const bw=bounds[1][0]-bounds[0][0], bh=bounds[1][1]-bounds[0][1];
-        // Pays trop petit à l'écran : on saute le label pour éviter le fouillis
-        if(!isFinite(bw)||!isFinite(bh)||bw<26||bh<18) return;
-        const c=pScale.geoPath.centroid(dp.feature);
-        if(!c||!isFinite(c[0])||!isFinite(c[1])) return;
-        const a2=NUM_TO_A2[String(dp.feature.id)];
-        const name=displayCountryName(a2,dp.feature);
-        const valTxt=fmtNum(dp.value);
-        const nameSize=Math.max(9,Math.min(14,bw/8));
-        const valSize=nameSize+2;
+  // ---- tooltip ------------------------------------------------------------
+  let stageRect=null;
+  function moveTip(e){
+    if(!stageRect) stageRect=stage.getBoundingClientRect();
+    let x=e.clientX-stageRect.left+12, y=e.clientY-stageRect.top+12;
+    const tw=tip.offsetWidth||140, th=tip.offsetHeight||60;
+    if(x+tw>W-4) x=e.clientX-stageRect.left-tw-12;
+    if(y+th>H-4) y=e.clientY-stageRect.top-th-12;
+    tip.style.left=Math.max(4,x)+"px";
+    tip.style.top=Math.max(4,y)+"px";
+  }
+  function showDataTip(s,e){
+    const name=displayCountryName(s.a2,s.f);
+    const pct=(total>0&&isFinite(s.value))?(s.value/total*100):null;
+    tip.innerHTML='<div class="fpgeo-tip-name"><span class="fpgeo-tip-dot" style="background:'+s.fill+'"></span>'+name+'</div>'
+      +'<div class="fpgeo-tip-val">'+fmtNum(s.value)+'</div>'
+      +(pct!=null?'<div class="fpgeo-tip-sub">'+pct.toLocaleString("fr-FR",{maximumFractionDigits:1})+' % du total · n° '+rankOf[s.a2]+'/'+matchedA2.length+'</div>':'');
+    tip.classList.add("fpgeo-tip-on");
+    moveTip(e);
+  }
+  function bindLandTip(p,a2,f){
+    p.addEventListener("pointerenter",function(e){
+      const name=displayCountryName(a2,f);
+      if(!name) return;
+      tip.innerHTML='<div class="fpgeo-tip-name"><span class="fpgeo-tip-dot" style="background:#c7d2de"></span>'+name+'</div>'
+        +'<div class="fpgeo-tip-nodata">Pas de donnée</div>';
+      tip.classList.add("fpgeo-tip-on");
+      moveTip(e);
+    });
+    p.addEventListener("pointermove",moveTip);
+    p.addEventListener("pointerleave",function(){ tip.classList.remove("fpgeo-tip-on"); });
+  }
+  dataShapes.forEach(function(s){
+    s.p.addEventListener("pointerenter",function(e){
+      gData.classList.add("fpgeo-hovering");
+      s.p.classList.add("fpgeo-hover");
+      gData.appendChild(s.p); // passe au premier plan pour un contour net
+      showDataTip(s,e);
+    });
+    s.p.addEventListener("pointermove",moveTip);
+    s.p.addEventListener("pointerleave",function(){
+      gData.classList.remove("fpgeo-hovering");
+      s.p.classList.remove("fpgeo-hover");
+      tip.classList.remove("fpgeo-tip-on");
+    });
+  });
 
-        ctx.font="700 "+nameSize+"px 'DM Sans',Arial,sans-serif";
-        ctx.lineWidth=3;
-        ctx.strokeStyle="rgba(255,255,255,.88)";
-        ctx.fillStyle="#132A3A";
-        ctx.strokeText(name,c[0],c[1]-valSize*0.55);
-        ctx.fillText(name,c[0],c[1]-valSize*0.55);
-
-        ctx.font="800 "+valSize+"px 'DM Sans',Arial,sans-serif";
-        ctx.lineWidth=3.2;
-        ctx.strokeStyle="rgba(255,255,255,.92)";
-        ctx.fillStyle="#0D1B2A";
-        ctx.strokeText(valTxt,c[0],c[1]+nameSize*0.55);
-        ctx.fillText(valTxt,c[0],c[1]+nameSize*0.55);
-      });
-      ctx.restore();
+  // ---- zoom / pan ---------------------------------------------------------
+  const K_MIN=0.7,K_MAX=13;
+  function zoomAbout(px,py,factor){
+    const k2=Math.max(K_MIN,Math.min(K_MAX,z.k*factor));
+    const r=k2/z.k;
+    z={k:k2,tx:px-(px-z.tx)*r,ty:py-(py-z.ty)*r};
+    applyView();
+  }
+  function animateZoomTo(target,dur){
+    if(zoomRaf) cancelAnimationFrame(zoomRaf);
+    const from={k:z.k,tx:z.tx,ty:z.ty};
+    let t0=null;
+    function step(ts){
+      if(dead) return;
+      if(t0==null) t0=ts;
+      const p=Math.min(1,(ts-t0)/dur), e=easeInOutCubic(p);
+      z={k:from.k+(target.k-from.k)*e,tx:from.tx+(target.tx-from.tx)*e,ty:from.ty+(target.ty-from.ty)*e};
+      applyView();
+      if(p<1) zoomRaf=requestAnimationFrame(step);
     }
-  };
+    zoomRaf=requestAnimationFrame(step);
+  }
+  function cancelIntro(){
+    if(introRaf){ cancelAnimationFrame(introRaf); introRaf=0; z={k:1,tx:0,ty:0}; labelsOn=true; applyView(); }
+  }
+  stage.addEventListener("wheel",function(e){
+    e.preventDefault();
+    cancelIntro();
+    if(!stageRect) stageRect=stage.getBoundingClientRect();
+    const f=Math.pow(1.0018,-e.deltaY);
+    zoomAbout(e.clientX-stageRect.left,e.clientY-stageRect.top,f);
+  },{passive:false});
+  let drag=null;
+  stage.addEventListener("pointerdown",function(e){
+    if(e.target.closest&&e.target.closest(".fpgeo-btn")) return;
+    cancelIntro();
+    drag={x:e.clientX,y:e.clientY,tx:z.tx,ty:z.ty,moved:false,id:e.pointerId};
+  });
+  stage.addEventListener("pointermove",function(e){
+    if(!drag) return;
+    const dx=e.clientX-drag.x, dy=e.clientY-drag.y;
+    if(!drag.moved&&Math.abs(dx)+Math.abs(dy)>3){
+      drag.moved=true;
+      stage.classList.add("fpgeo-drag");
+      try{ stage.setPointerCapture(drag.id); }catch(err){}
+    }
+    if(drag.moved){ z.tx=drag.tx+dx; z.ty=drag.ty+dy; applyView(); }
+  });
+  function endDrag(){ if(drag&&drag.moved) stage.classList.remove("fpgeo-drag"); drag=null; stageRect=null; }
+  stage.addEventListener("pointerup",endDrag);
+  stage.addEventListener("pointercancel",endDrag);
+  stage.addEventListener("dblclick",function(e){
+    e.preventDefault();
+    if(!stageRect) stageRect=stage.getBoundingClientRect();
+    zoomAbout(e.clientX-stageRect.left,e.clientY-stageRect.top,1.8);
+  });
+  ctrls.addEventListener("click",function(e){
+    const b=e.target.closest(".fpgeo-btn"); if(!b) return;
+    cancelIntro();
+    if(b.dataset.act==="in") zoomAbout(W/2,H/2,1.45);
+    else if(b.dataset.act==="out") zoomAbout(W/2,H/2,1/1.45);
+    else animateZoomTo({k:1,tx:0,ty:0},550);
+  });
 
-  chartInstances[canvasId]=new Chart(canvas.getContext("2d"),{
-    type:"choropleth",
-    plugins:[geoLabelPlugin],
-    data:{
-      labels:chartLabels,
-      datasets:[{
-        label:w.title||"Carte",
-        outline:featureSet,
-        data:dataPoints,
-        backgroundColor:bgColors,
-        borderColor:"#fff",
-        borderWidth:0.6
-      }]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      animation:false,
-      showOutline:true,
-      showGraticule:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          callbacks:{
-            label:function(ctx){
-              const v=ctx.raw&&ctx.raw.value;
-              const a2f=ctx.raw&&ctx.raw.feature?NUM_TO_A2[String(ctx.raw.feature.id)]:null;
-              const nm=displayCountryName(a2f,ctx.raw&&ctx.raw.feature);
-              if(v==null) return nm+" — pas de donnée";
-              return nm+": "+fmtNum(v);
-            }
-          }
-        }
-      },
-      scales:{
-        projection:{
-          axis:"x",
-          projection: scope==="europe" ? "mercator" : "equalEarth",
-          projectionScale: scope==="europe" ? 1.5 : 1.25,
-          projectionOffset:[0,0]
-        }
+  // ---- animation d'ouverture ---------------------------------------------
+  const reduceMotion=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // apparition progressive des pays colorés (du plus fort au plus faible)
+  dataShapes.forEach(function(s,i){
+    if(skipIntro||reduceMotion) return;
+    s.p.style.opacity="0";
+    s.p.style.transitionDelay=Math.min(700,120+i*60)+"ms";
+  });
+  if(!(skipIntro||reduceMotion)){
+    gLand.style.opacity="0";
+    gLand.style.transition="opacity .6s ease";
+    svg.style.opacity="0";
+    svg.style.transition="opacity .4s ease";
+  }
+
+  if(skipIntro||reduceMotion){
+    z={k:1,tx:0,ty:0}; labelsOn=true; applyView();
+  } else {
+    // vue de départ : carte entière, puis zoom cinématique vers la zone des données
+    let start;
+    const kN=fitAll.s/fit.s;
+    if(kN<0.9){
+      start={k:kN,tx:fitAll.tx-fit.tx*kN,ty:fitAll.ty-fit.ty*kN};
+    } else {
+      const k0=0.82;
+      start={k:k0,tx:(1-k0)*W/2,ty:(1-k0)*H/2};
+    }
+    z=start; applyView();
+    requestAnimationFrame(function(){
+      svg.style.opacity="1";
+      gLand.style.opacity="1";
+      dataShapes.forEach(function(s){ s.p.style.opacity="1"; });
+    });
+    const DUR=1250;
+    let t0=null;
+    function intro(ts){
+      if(dead) return;
+      if(t0==null) t0=ts;
+      const p=Math.min(1,(ts-t0)/DUR), e=easeInOutCubic(p);
+      z={k:start.k+(1-start.k)*e,tx:start.tx*(1-e),ty:start.ty*(1-e)};
+      if(!labelsOn&&p>=0.6) labelsOn=true;
+      applyView();
+      if(p<1) introRaf=requestAnimationFrame(intro);
+      else{
+        introRaf=0;
+        // nettoie les délais/opacités inline pour laisser la main au CSS (survol)
+        setTimeout(function(){
+          if(dead) return;
+          dataShapes.forEach(function(s){ s.p.style.opacity=""; s.p.style.transitionDelay=""; });
+          labels.forEach(function(L){ L.g.style.transitionDelay="0ms"; });
+        },900);
       }
     }
-  });
+    introRaf=requestAnimationFrame(intro);
+  }
 
-  // Légende dégradé min -> max
+  // ---- légende + avertissements ------------------------------------------
   const legendEl=document.getElementById(canvasId+"-legend");
   if(legendEl){
     legendEl.innerHTML=
       '<span>'+fmtNum(vmin)+'</span>'
-      +'<span style="flex:1;height:6px;border-radius:3px;background:linear-gradient(90deg,'+gradientShade(baseColor,0.12)+','+gradientShade(baseColor,1)+')"></span>'
+      +'<span style="flex:1;height:7px;border-radius:4px;background:linear-gradient(90deg,'+gradientShade(baseColor,0.12)+','+gradientShade(baseColor,1)+');box-shadow:inset 0 0 0 1px rgba(13,27,42,.06)"></span>'
       +'<span>'+fmtNum(vmax)+'</span>';
   }
   const warnEl=document.getElementById(canvasId+"-warn");
@@ -566,4 +890,31 @@ function renderGeoChart(w, el, canvasId, rawLabels, rawValues, chartInstances, f
       warnEl.style.display="none";
     }
   }
+
+  // ---- redimensionnement + cycle de vie ----------------------------------
+  let roTimer=0;
+  const ro=new ResizeObserver(function(){
+    if(dead) return;
+    const nw=stage.clientWidth, nh=stage.clientHeight;
+    if(Math.abs(nw-W)<8&&Math.abs(nh-H)<8) return;
+    clearTimeout(roTimer);
+    roTimer=setTimeout(function(){
+      if(dead) return;
+      dead=true; try{ro.disconnect();}catch(e){}
+      if(introRaf) cancelAnimationFrame(introRaf);
+      if(zoomRaf) cancelAnimationFrame(zoomRaf);
+      buildGeoScene(w,el,canvasId,rawLabels,rawValues,chartInstances,fmtNum,features,0,true);
+    },160);
+  });
+  ro.observe(stage);
+
+  chartInstances[canvasId]={
+    destroy:function(){
+      dead=true;
+      clearTimeout(roTimer);
+      try{ ro.disconnect(); }catch(e){}
+      if(introRaf) cancelAnimationFrame(introRaf);
+      if(zoomRaf) cancelAnimationFrame(zoomRaf);
+    }
+  };
 }
