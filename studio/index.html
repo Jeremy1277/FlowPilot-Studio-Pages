@@ -5247,6 +5247,14 @@ function openTuning(wid){
   if(isGeo){
     const curScope = w.geoScope || 'auto';
     const curPal   = w.geoPalette || 'ambre';
+    // La colonne contient-elle des codes postaux ? (sinon, inutile d'afficher ce réglage)
+    let colIsCp = false;
+    try{
+      if(w.col && typeof window.FP_geoClassify==='function' && Array.isArray(rows)){
+        const sample = rows.slice(0,80).map(r=>r[w.col]);
+        colIsCp = window.FP_geoClassify(sample)==='cp';
+      }
+    }catch(e){}
     const PALS = window.FP_GEO_PALETTES || {};
     const palChip = (id,label,grad) =>
       '<button type="button" class="tn-geo-pal fp-chip'+(curPal===id?' sel':'')+'" data-pal="'+id+'" title="'+label+'" '
@@ -5261,14 +5269,24 @@ function openTuning(wid){
       +'<span style="font-size:11px;color:var(--muted)">Couleur perso</span>'
       +'<input type="color" id="tn-geo-color" value="'+(w.color||'#4a7fa5')+'" style="width:28px;height:28px;border:none;padding:0;cursor:pointer;border-radius:6px"/>'
       +'</div>'
-      +'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Codes postaux (si la colonne en contient)</div>'
-      +'<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">'
-      +'<select id="tn-geo-cpcountry" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;font-family:inherit">'
-      + [['auto','Pays : détection auto'],['FR','France (départements)'],['BE','Belgique'],['CH','Suisse'],['DE','Allemagne'],['ES','Espagne'],['IT','Italie'],['NL','Pays-Bas'],['PT','Portugal'],['PL','Pologne'],['AT','Autriche'],['LU','Luxembourg'],['GB','Royaume-Uni'],['DK','Danemark'],['NO','Norvège'],['SE','Suède'],['FI','Finlande'],['CZ','Tchéquie'],['HU','Hongrie'],['SI','Slovénie']].map(([v,l]) =>
-          '<option value="'+v+'"'+((w.geoCpCountry||'auto')===v?' selected':'')+'>'+l+'</option>'
+      +'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Zone d\'affichage</div>'
+      +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">'
+      +'<select id="tn-geo-scope" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;font-family:inherit">'
+      + [['auto','Auto (selon les données)'],['europe','Europe'],['world','Monde'],['FR','France'],['BE','Belgique'],['CH','Suisse'],['DE','Allemagne'],['ES','Espagne'],['IT','Italie'],['NL','Pays-Bas'],['PT','Portugal'],['PL','Pologne'],['AT','Autriche'],['LU','Luxembourg'],['GB','Royaume-Uni'],['IE','Irlande'],['DK','Danemark'],['NO','Norvège'],['SE','Suède'],['FI','Finlande'],['CZ','Tchéquie'],['HU','Hongrie'],['SI','Slovénie']].map(([v,l]) =>
+          '<option value="'+v+'"'+(((curScope==='france'?'FR':curScope))===v?' selected':'')+'>'+l+'</option>'
         ).join('')
       +'</select>'
       +'</div>'
+      + (colIsCp
+        ? '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Pays des codes postaux</div>'
+          +'<div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">'
+          +'<select id="tn-geo-cpcountry" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;font-family:inherit">'
+          + [['auto','Détection auto'],['FR','France (départements)'],['BE','Belgique'],['CH','Suisse'],['DE','Allemagne'],['ES','Espagne'],['IT','Italie'],['NL','Pays-Bas'],['PT','Portugal'],['PL','Pologne'],['AT','Autriche'],['LU','Luxembourg'],['GB','Royaume-Uni'],['DK','Danemark'],['NO','Norvège'],['SE','Suède'],['FI','Finlande'],['CZ','Tchéquie'],['HU','Hongrie'],['SI','Slovénie']].map(([v,l]) =>
+              '<option value="'+v+'"'+((w.geoCpCountry||'auto')===v?' selected':'')+'>'+l+'</option>'
+            ).join('')
+          +'</select>'
+          +'</div>'
+        : '')
       +'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Format des valeurs</div>'
       +'<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">'
       +'<select id="tn-geo-format" style="flex:1;min-width:140px;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;font-family:inherit">'
@@ -5281,14 +5299,7 @@ function openTuning(wid){
       + ['EUR','USD','GBP','CHF'].map(c => '<option value="'+c+'"'+((w.valueCurrency||'EUR')===c?' selected':'')+'>'+c+'</option>').join('')
       +'</select>'
       +'</div>'
-      +'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Zone d\'affichage</div>'
-      +'<div style="display:flex;gap:6px;align-items:center">'
-      +'<select id="tn-geo-scope" style="flex:1;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;font-family:inherit">'
-      + [['auto','Auto (selon les données)'],['europe','Europe'],['world','Monde'],['FR','France'],['BE','Belgique'],['CH','Suisse'],['DE','Allemagne'],['ES','Espagne'],['IT','Italie'],['NL','Pays-Bas'],['PT','Portugal'],['PL','Pologne'],['AT','Autriche'],['LU','Luxembourg'],['GB','Royaume-Uni'],['IE','Irlande'],['DK','Danemark'],['NO','Norvège'],['SE','Suède'],['FI','Finlande'],['CZ','Tchéquie'],['HU','Hongrie'],['SI','Slovénie']].map(([v,l]) =>
-          '<option value="'+v+'"'+(((curScope==='france'?'FR':curScope))===v?' selected':'')+'>'+l+'</option>'
-        ).join('')
-      +'</select>'
-      +'</div>';
++'';
     section('Carte', geoHtml);
     const palWrap = document.getElementById('tn-geo-pals');
     if(palWrap){
@@ -10285,7 +10296,7 @@ function calcColApply(){
 <script type="module">
 import { renderBar, renderBarPanel, readBarPanel } from './widgets/bar.js';
 import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=3';
-import { renderGeo, GEO_PALETTES } from './widgets/geo.js';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js';
 import { t, getLang, setLang, createLangSwitcher, applyI18n } from './widgets/i18n.js';
 import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js';
 window.FP_FONT_LIBRARY     = FONT_LIBRARY;
@@ -10300,6 +10311,7 @@ window.FP_renderDonutPanel = renderDonutPanel;
 window.FP_readDonutPanel   = readDonutPanel;
 window.FP_renderGeo        = renderGeo;
 window.FP_GEO_PALETTES     = GEO_PALETTES;
+window.FP_geoClassify      = classifyGeoLabels;
 window.FP_t                = t;
 window.FP_getLang           = getLang;
 window.FP_setLang           = setLang;

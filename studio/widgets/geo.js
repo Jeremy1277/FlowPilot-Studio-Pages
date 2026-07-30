@@ -388,6 +388,10 @@ function gradientShade(baseHex,t){
 
 const GEO_NODATA_COLOR="#e7ecf2";
 
+// Classification exposée à l'app (le Tuning s'en sert pour n'afficher le
+// réglage « Codes postaux » que si la colonne en contient réellement).
+export { classifyGeoLabels };
+
 /* ============================================================================
  * Jeux de couleurs (dégradés séquentiels clair → foncé)
  * w.geoPalette : 'ambre' (défaut) | 'ocean' | 'chaleur' | 'emeraude' | 'violet'
