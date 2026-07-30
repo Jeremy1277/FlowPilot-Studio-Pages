@@ -154,7 +154,7 @@ export function renderDonut(w, elId, rawLabels, rawValues, chartInstances, fmtNu
       (legH ? 'height:' + legH + 'px' : 'max-height:80%'),
       'background:'+(document.body&&document.body.classList.contains('fp-dark')?'rgba(21,31,44,0.92)':'rgba(255,255,255,0.92)'),
       'backdrop-filter:blur(4px)',
-      'border:1px solid #e2e8f0',
+      'border:1px solid var(--border)',
       'border-radius:10px',
       'padding:8px 10px',
       'box-shadow:0 2px 10px rgba(13,27,42,.1)',
@@ -180,7 +180,7 @@ export function renderDonut(w, elId, rawLabels, rawValues, chartInstances, fmtNu
       row.innerHTML =
         '<div style="width:10px;height:10px;border-radius:3px;flex-shrink:0;background:' + bgColors[i] + '"></div>'
         + '<div style="font-size:12px;color:var(--dark,#1a2733);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + l + '">' + l + '</div>'
-        + '<div style="font-size:11px;font-weight:700;color:#607287;flex-shrink:0;margin-left:4px">' + legTxt + '</div>';
+        + '<div style="font-size:11px;font-weight:700;color:var(--mid);flex-shrink:0;margin-left:4px">' + legTxt + '</div>';
       leg.appendChild(row);
     });
 
@@ -404,7 +404,7 @@ function makeResizableLegend(leg, container, w, canvasId) {
   CORNERS.forEach(function(c) {
     const handle = document.createElement('div');
     handle.className = 'fp-donut-resize-handle';
-    let posCss = 'position:absolute;width:11px;height:11px;border-radius:50%;background:#fff;border:2px solid #EF9F27;cursor:' + c.cursor + ';z-index:11;opacity:0;transition:opacity .15s;';
+    let posCss = 'position:absolute;width:11px;height:11px;border-radius:50%;background:var(--card);border:2px solid #EF9F27;cursor:' + c.cursor + ';z-index:11;opacity:0;transition:opacity .15s;';
     if (c.top)    posCss += 'top:' + c.top + ';';
     if (c.bottom) posCss += 'bottom:' + c.bottom + ';';
     if (c.left)   posCss += 'left:' + c.left + ';';
@@ -479,8 +479,8 @@ export function renderDonutPanel(w) {
   const legW      = w.donutLegW    || 160;
 
   function sec(title, html) {
-    return '<div style="border-top:1px solid #e2e8f0;padding:8px 0 4px">'
-      + '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#8ca0b3;margin-bottom:7px">' + title + '</div>'
+    return '<div style="border-top:1px solid var(--border);padding:8px 0 4px">'
+      + '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px">' + title + '</div>'
       + html + '</div>';
   }
   function rd(name, val, lbl, cur) {
@@ -493,9 +493,9 @@ export function renderDonutPanel(w) {
   }
   function slider(id, label, min, max, val, unit) {
     return '<div style="display:flex;align-items:center;gap:8px;margin-top:7px">'
-      + '<span style="font-size:11px;color:#8ca0b3;white-space:nowrap;width:90px">' + label + '</span>'
+      + '<span style="font-size:11px;color:var(--muted);white-space:nowrap;width:90px">' + label + '</span>'
       + '<input type="range" id="' + id + '" min="' + min + '" max="' + max + '" value="' + val + '" style="flex:1;accent-color:#EF9F27"/>'
-      + '<span id="' + id + '-val" style="font-size:10px;color:#8ca0b3;width:32px">' + val + unit + '</span>'
+      + '<span id="' + id + '-val" style="font-size:10px;color:var(--muted);width:32px">' + val + unit + '</span>'
       + '</div>';
   }
   function swatch(name, val, lbl, cur, colors) {
@@ -513,9 +513,9 @@ export function renderDonutPanel(w) {
     + rd('dn-variant','semi','Semi-cercle',variant)
     + '</div>'
     + '<div id="dn-cutout-row" style="display:' + (variant==='pie'?'none':'flex') + ';align-items:center;gap:8px;margin-top:8px">'
-    + '<span style="font-size:11px;color:#8ca0b3;white-space:nowrap">Épaisseur trou</span>'
+    + '<span style="font-size:11px;color:var(--muted);white-space:nowrap">Épaisseur trou</span>'
     + '<input type="range" id="dn-cutout" min="20" max="85" value="' + cutout + '" style="flex:1;accent-color:#EF9F27"/>'
-    + '<span id="dn-cutout-val" style="font-size:10px;color:#8ca0b3;width:28px">' + cutout + '%</span>'
+    + '<span id="dn-cutout-val" style="font-size:10px;color:var(--muted);width:28px">' + cutout + '%</span>'
     + '</div>'
   )
   + sec('Couleurs',
@@ -524,9 +524,9 @@ export function renderDonutPanel(w) {
     + swatch('dn-palette','pastel','Pastel',palette,DONUT_PALETTES.pastel)
     + swatch('dn-palette','nb','Noir & blanc',palette,DONUT_PALETTES.nb)
     + '</div>'
-    + '<div style="font-size:10px;color:#8ca0b3;margin-top:8px;font-style:italic">Cliquez sur une part du graphique pour personnaliser sa couleur individuellement.</div>'
+    + '<div style="font-size:10px;color:var(--muted);margin-top:8px;font-style:italic">Cliquez sur une part du graphique pour personnaliser sa couleur individuellement.</div>'
     + (Object.keys(w.donutColorOverrides || {}).length
-        ? '<button type="button" id="dn-reset-colors" style="margin-top:7px;font-size:11px;padding:5px 10px;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;color:#607287">↺ Réinitialiser les couleurs personnalisées</button>'
+        ? '<button type="button" id="dn-reset-colors" style="margin-top:7px;font-size:11px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);cursor:pointer;color:var(--mid)">↺ Réinitialiser les couleurs personnalisées</button>'
         : '')
   )
   + sec('Étiquettes sur les parts',
@@ -537,14 +537,14 @@ export function renderDonutPanel(w) {
   + sec('Légende',
     chk('donutShowLeg','Afficher la légende', legend !== 'none')
     + slider('dn-legw','Largeur légende',80,280,legW,'px')
-    + '<div style="font-size:10px;color:#8ca0b3;margin-top:6px;font-style:italic">Glissez la légende directement sur le graphique pour la repositionner.</div>'
+    + '<div style="font-size:10px;color:var(--muted);margin-top:6px;font-style:italic">Glissez la légende directement sur le graphique pour la repositionner.</div>'
   )
   + sec('Affichage',
     chk('donutExplode','Parts éclatées', explode)
     + chk('donutHoverFx','Effet de survol (halo)', hoverFx)
     + '<div style="display:flex;align-items:center;gap:8px;margin-top:8px">'
-    + '<span style="font-size:11px;color:#8ca0b3">Top N</span>'
-    + '<select id="dn-topn" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px;font-size:11px;font-family:DM Sans,sans-serif">'
+    + '<span style="font-size:11px;color:var(--muted)">Top N</span>'
+    + '<select id="dn-topn" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:DM Sans,sans-serif">'
     + [5,8,10,15].map(n => '<option value="'+n+'" '+(topN===n?'selected':'')+'>Top '+n+'</option>').join('')
     + '</select>'
     + '</div>'

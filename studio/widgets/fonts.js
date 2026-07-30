@@ -56,10 +56,10 @@ function buildFontPicker(currentFontId, onSelect) {
       loadFont(font.id); // précharger pour l'aperçu
       const item = document.createElement('button');
       const active = font.id === (currentFontId || 'dmsans');
-      item.style.cssText = `display:flex;align-items:center;justify-content:space-between;width:100%;border:1.5px solid ${active ? 'var(--accent,#EF9F27)' : 'transparent'};background:${active ? 'var(--accent-soft,#FFF3E0)' : '#fff'};border-radius:7px;padding:7px 10px;cursor:pointer;font-family:${font.family};font-size:14px;color:var(--dark,#1a2733);transition:all .15s`;
+      item.style.cssText = `display:flex;align-items:center;justify-content:space-between;width:100%;border:1.5px solid ${active ? 'var(--accent,#EF9F27)' : 'transparent'};background:${active ? 'var(--accent-soft,#FFF3E0)' : 'var(--card,#fff)'};border-radius:7px;padding:7px 10px;cursor:pointer;font-family:${font.family};font-size:14px;color:var(--dark,#1a2733);transition:all .15s`;
       item.innerHTML = `<span>${font.label}</span>` + (active ? '<span style="font-size:11px;color:var(--accent,#EF9F27)">✓</span>' : '');
-      item.addEventListener('mouseenter', () => { if (!active) item.style.background = '#f8fafc'; });
-      item.addEventListener('mouseleave', () => { if (!active) item.style.background = '#fff'; });
+      item.addEventListener('mouseenter', () => { if (!active) item.style.background = 'var(--card2,#f8fafc)'; });
+      item.addEventListener('mouseleave', () => { if (!active) item.style.background = 'var(--card,#fff)'; });
       item.addEventListener('click', () => onSelect(font.id));
       wrap.appendChild(item);
     });

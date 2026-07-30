@@ -74,7 +74,7 @@ function injectCSS() {
   s.id = 'fp-filter-css';
   s.textContent = `
     .fp-filter-col-btn {
-      border:1px solid var(--border);background:#f8fafc;border-radius:8px;
+      border:1px solid var(--border);background:var(--card2);border-radius:8px;
       padding:5px 10px;font-size:12px;font-family:'DM Sans',sans-serif;
       color:var(--dark);cursor:pointer;transition:all .15s;
       display:flex;align-items:center;gap:2px;white-space:nowrap;
@@ -98,7 +98,7 @@ function injectCSS() {
     .fp-filter-reset:hover { color:var(--coral); }
     .fp-popup {
       position:absolute;top:calc(100% + 6px);left:0;z-index:400;
-      background:#fff;border:1px solid var(--border);border-radius:12px;
+      background:var(--card);border:1px solid var(--border);border-radius:12px;
       box-shadow:0 8px 24px rgba(13,27,42,.14);padding:12px;
     }
   `;
