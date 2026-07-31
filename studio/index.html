@@ -946,7 +946,7 @@ body.fp-dark{
 }
 body.fp-dark #topbar{background:#121c29}
 body.fp-dark select,body.fp-dark textarea,
-body.fp-dark input[type=text],body.fp-dark input[type=number],body.fp-dark input[type=search],body.fp-dark input[type=date]{
+body.fp-dark input[type=text],body.fp-dark input[type=number],body.fp-dark input[type=search],body.fp-dark input[type=date],body.fp-dark input[type=password]{
   background:#1a2534!important;color:var(--dark)!important;border-color:#2c3e55!important}
 body.fp-dark ::placeholder{color:#5c728a}
 body.fp-dark ::-webkit-scrollbar-thumb{background:#2c3e55}
@@ -1128,14 +1128,14 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
         <div class="data-card">
           <!-- DROP ZONE -->
           <div class="drop-zone" id="drop-zone"
-            onclick="document.getElementById('file-input').click()"
+            onclick="fpOpenFile()"
             ondragover="event.preventDefault();this.classList.add('drag-over')"
             ondragleave="this.classList.remove('drag-over')"
             ondrop="handleDrop(event)">
             
                         <p data-i18n="data_dropzone_text">Excel ou CSV — jusqu'à 50 000 lignes</p>
             <div class="dz-btn" data-i18n="data_browse_btn">Parcourir…</div>
-            <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])"/>
+            <input type="file" id="file-input" accept=".xlsx,.xls,.xlsm,.csv" style="display:none" onchange="handleFile(this.files[0])"/>
           </div>
 
           <div class="file-type-row">
@@ -2379,7 +2379,7 @@ function fpLoadUI(show, phase, sub){
     ov.id='fp-load-overlay';
     ov.style.cssText='position:fixed;inset:0;z-index:1200;background:rgba(13,27,42,.6);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;cursor:progress';
     ov.innerHTML='<div style="background:var(--card);border:1px solid var(--border);border-radius:18px;padding:26px 30px;width:min(430px,92vw);box-shadow:0 28px 72px rgba(0,0,0,.4);text-align:center;font-family:\'DM Sans\',sans-serif">'
-      +'<div style="font-size:32px;margin-bottom:10px">📊</div>'
+      +'<div style="width:64px;height:64px;border-radius:20px;margin:0 auto 14px;display:grid;place-items:center;color:var(--accent);background:var(--accent-soft);border:1px solid rgba(239,159,39,.25);box-shadow:0 10px 24px rgba(13,27,42,.12)"><svg class="ui-svg" style="width:34px;height:34px"><use href="#i-hero-bars"></use></svg></div>'
       +'<div id="fp-load-phase" style="font-weight:800;font-size:15px;color:var(--dark)"></div>'
       +'<div id="fp-load-sub" style="font-size:12px;color:var(--muted);margin-top:5px;min-height:16px"></div>'
       +'<div style="margin-top:16px;height:8px;border-radius:99px;background:var(--bg);overflow:hidden;position:relative">'
@@ -2437,6 +2437,8 @@ function xlsxWorkerCall(msg, expect, transfer){
 
 function handleFile(file){
   if(!file) return;
+  window.__fpLastFileMeta={name:file.name, size:file.size, handle:window.__fpPendingHandle||null};
+  window.__fpPendingHandle=null;
   fpLoadUI(true,'Lecture de « '+file.name+' »…','Ouverture du fichier');
   const reader=new FileReader();
   reader.onerror=()=>{ fpLoadUI(false); toast('⚠ Lecture du fichier impossible'); };
@@ -2508,6 +2510,9 @@ async function loadSheetFromSource(source, sheetInfo, fileName, showSheetInName)
     await fpLoadYield();
     loadData(parsed, showSheetInName?fileName+' — '+sheetInfo.name:fileName);
     fpLoadUI(false);
+    try{ fpHistoryAdd({name:fileName, sheet:showSheetInName?sheetInfo.name:null,
+      rows:parsed.length, size:(window.__fpLastFileMeta&&window.__fpLastFileMeta.size)||null,
+      date:Date.now()}, window.__fpLastFileMeta&&window.__fpLastFileMeta.handle); }catch(e){}
   }catch(err){
     fpLoadUI(false);
     toast('⚠ Erreur: '+err.message);
@@ -5127,66 +5132,105 @@ function agentBuildFull(){
 // ── OPENAI GPT-4o-mini INTEGRATION ────────────────────────────────────────
 // Clé OpenAI stockée en localStorage (jamais dans le code)
 function getOpenAIKey(){
-  return localStorage.getItem('flowpilot_openai_key')||'';
+  const pid=fpAiActive();
+  return pid?(fpAiKeys()[pid]||''):'';
 }
 
-// ── Routeur IA multi-fournisseur ─────────────────────────────────────────
-// Une clé sk-ant-… route vers l'API Claude (Anthropic), une clé sk-… vers
-// OpenAI. Même clé stockée, même appel : fpAiChat(messages, opts) -> texte.
-function fpAiProviderInfo(){
-  const k=getOpenAIKey()||'';
-  return k.indexOf('sk-ant-')===0
-    ? {id:'anthropic', label:'Claude (Anthropic)', model:'claude-3-5-haiku-latest', host:'api.anthropic.com'}
-    : {id:'openai', label:'GPT-4o-mini (OpenAI)', model:'gpt-4o-mini', host:'api.openai.com'};
+// ── Fournisseurs IA : registre, clés multiples, routeur, test de clé ─────
+const FP_AI_PROVIDERS={
+  anthropic:{label:'Claude (Anthropic)', short:'Claude',   host:'api.anthropic.com', url:'https://api.anthropic.com/v1/messages',        model:'claude-3-5-haiku-latest', hint:'sk-ant-…', doc:'console.anthropic.com'},
+  openai:   {label:'GPT-4o-mini (OpenAI)', short:'OpenAI', host:'api.openai.com',   url:'https://api.openai.com/v1/chat/completions',   model:'gpt-4o-mini',             hint:'sk-…',     doc:'platform.openai.com'},
+  mistral:  {label:'Mistral Small',        short:'Mistral',host:'api.mistral.ai',   url:'https://api.mistral.ai/v1/chat/completions',   model:'mistral-small-latest',    hint:'clé Mistral', doc:'console.mistral.ai'},
+  deepseek: {label:'DeepSeek Chat',        short:'DeepSeek',host:'api.deepseek.com',url:'https://api.deepseek.com/v1/chat/completions', model:'deepseek-chat',           hint:'sk-…',     doc:'platform.deepseek.com'},
+};
+window.FP_AI_PROVIDERS=FP_AI_PROVIDERS;
+function fpAiKeys(){ try{ return JSON.parse(localStorage.getItem('fp_ai_keys')||'{}'); }catch(e){ return {}; } }
+function fpAiSetKey(pid,key){
+  const m=fpAiKeys();
+  if(key) m[pid]=key.trim(); else delete m[pid];
+  try{ localStorage.setItem('fp_ai_keys',JSON.stringify(m)); }catch(e){}
+  if(key&&!fpAiActive()) fpAiSetActive(pid);
 }
-async function fpAiChat(messages, opts){
+function fpAiSetActive(pid){ try{ localStorage.setItem('fp_ai_provider',pid); }catch(e){} }
+function fpAiActive(){
+  const m=fpAiKeys();
+  const pref=localStorage.getItem('fp_ai_provider');
+  if(pref&&m[pref]) return pref;
+  const first=Object.keys(FP_AI_PROVIDERS).find(p=>m[p]);
+  return first||null;
+}
+// Migration de l'ancienne clé unique (flowpilot_openai_key)
+(function(){
+  const legacy=localStorage.getItem('flowpilot_openai_key');
+  if(legacy&&!Object.keys(fpAiKeys()).length){
+    const pid=legacy.indexOf('sk-ant-')===0?'anthropic':'openai';
+    fpAiSetKey(pid,legacy); fpAiSetActive(pid);
+  }
+})();
+function fpAiProviderInfo(){
+  const pid=fpAiActive()||'openai';
+  return Object.assign({id:pid},FP_AI_PROVIDERS[pid]);
+}
+window.fpAiProviderInfo=fpAiProviderInfo;
+
+async function fpAiRequest(pid,key,messages,opts){
   opts=opts||{};
-  const key=getOpenAIKey();
-  if(!key) throw new Error('Aucune clé API configurée.');
-  const p=fpAiProviderInfo();
+  const P=FP_AI_PROVIDERS[pid];
   let resp;
   try{
-    if(p.id==='anthropic'){
+    if(pid==='anthropic'){
       const sys=messages.filter(m=>m.role==='system').map(m=>m.content).join('\n\n');
       const rest=messages.filter(m=>m.role!=='system');
-      const body={model:p.model, max_tokens:opts.maxTokens||600,
+      const body={model:P.model, max_tokens:opts.maxTokens||600,
         messages:rest.length?rest:[{role:'user',content:sys||'Bonjour'}]};
       if(sys&&rest.length) body.system=sys;
       if(opts.temperature!=null) body.temperature=opts.temperature;
-      resp=await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
+      resp=await fetch(P.url,{method:'POST',
         headers:{'Content-Type':'application/json','x-api-key':key,
           'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify(body)
-      });
+        body:JSON.stringify(body)});
     } else {
-      const body={model:p.model, max_tokens:opts.maxTokens||600, messages:messages};
+      const body={model:P.model, max_tokens:opts.maxTokens||600, messages:messages};
       if(opts.temperature!=null) body.temperature=opts.temperature;
       if(opts.json) body.response_format={type:'json_object'};
-      resp=await fetch('https://api.openai.com/v1/chat/completions',{
-        method:'POST',
+      resp=await fetch(P.url,{method:'POST',
         headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-        body:JSON.stringify(body)
-      });
+        body:JSON.stringify(body)});
     }
   }catch(netErr){
-    throw new Error('Impossible de joindre '+p.host+' — réseau, pare-feu ou extension qui bloque ce domaine. '
-      +'Astuce : une clé '+(p.id==='openai'?'Claude/Anthropic (sk-ant-…)':'OpenAI (sk-…)')+' passera peut-être là où celle-ci est bloquée.');
+    throw new Error('Impossible de joindre '+P.host+' — réseau, pare-feu ou extension qui bloque ce domaine. Essaie un autre fournisseur dans Réglages → IA.');
   }
   const data=await resp.json().catch(()=>({}));
   if(!resp.ok){
-    if(resp.status===401) throw new Error('Clé API invalide ou expirée ('+p.label+').');
+    if(resp.status===401||resp.status===403) throw new Error('Clé API invalide ou expirée ('+P.label+').');
     throw new Error((data&&data.error&&data.error.message)||('HTTP '+resp.status));
   }
-  if(p.id==='anthropic') return (data.content&&data.content[0]&&data.content[0].text)||'';
+  if(pid==='anthropic') return (data.content&&data.content[0]&&data.content[0].text)||'';
   return (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||'';
 }
+
+async function fpAiChat(messages, opts){
+  const pid=fpAiActive();
+  if(!pid) throw new Error('Aucune clé API configurée (Réglages → IA).');
+  return fpAiRequest(pid,fpAiKeys()[pid],messages,opts);
+}
 window.fpAiChat=fpAiChat;
-window.fpAiProviderInfo=fpAiProviderInfo;
+
+// Test d'une clé auprès du fournisseur (mini requête) — utilisé par Réglages
+async function fpAiTestKey(pid,key){
+  try{
+    await fpAiRequest(pid,key,[{role:'user',content:'ping'}],{maxTokens:1});
+    return {ok:true, message:'Clé valide — '+FP_AI_PROVIDERS[pid].model};
+  }catch(e){
+    return {ok:false, message:e.message};
+  }
+}
+window.fpAiTestKey=fpAiTestKey;
 
 function setOpenAIKey(k){
   if(k && k.startsWith('sk-')){
-    localStorage.setItem('flowpilot_openai_key', k);
+    const pid=k.indexOf('sk-ant-')===0?'anthropic':'openai';
+    fpAiSetKey(pid,k); fpAiSetActive(pid);
     return true;
   }
   return false;
@@ -10827,6 +10871,251 @@ function calcColApply(){
   toast(msg);
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+//  V6 — RÉGLAGES : tiroir latéral (profil, langue, historique, IA, thème)
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── Ouverture de fichier avec accès direct quand le navigateur le permet ──
+async function fpOpenFile(){
+  if(window.showOpenFilePicker){
+    try{
+      const [h]=await window.showOpenFilePicker({
+        multiple:false,
+        types:[{description:'Données (Excel / CSV)',accept:{
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx','.xlsm'],
+          'application/vnd.ms-excel':['.xls'],
+          'text/csv':['.csv']}}]
+      });
+      window.__fpPendingHandle=h;
+      const f=await h.getFile();
+      handleFile(f);
+      return;
+    }catch(e){
+      if(e&&e.name==='AbortError') return; // annulé par l'utilisateur
+      // API indisponible/refusée -> repli sur l'input classique
+    }
+  }
+  document.getElementById('file-input').click();
+}
+
+// ── Historique des fichiers (métadonnées en localStorage, accès en IndexedDB)
+function fpIdb(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open('flowpilot',1);
+    r.onupgradeneeded=()=>{ r.result.createObjectStore('handles'); };
+    r.onsuccess=()=>res(r.result);
+    r.onerror=()=>rej(r.error);
+  });
+}
+async function fpIdbSet(k,v){
+  const db=await fpIdb();
+  return new Promise((res,rej)=>{
+    const tx=db.transaction('handles','readwrite');
+    tx.objectStore('handles').put(v,k);
+    tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
+  });
+}
+async function fpIdbGet(k){
+  const db=await fpIdb();
+  return new Promise((res,rej)=>{
+    const rq=db.transaction('handles').objectStore('handles').get(k);
+    rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);
+  });
+}
+function fpHistory(){ try{ return JSON.parse(localStorage.getItem('fp_file_history')||'[]'); }catch(e){ return []; } }
+function fpHistoryAdd(meta, handle){
+  let h=fpHistory().filter(x=>!(x.name===meta.name&&x.sheet===meta.sheet));
+  meta.hasHandle=!!handle;
+  h.unshift(meta); h=h.slice(0,8);
+  try{ localStorage.setItem('fp_file_history',JSON.stringify(h)); }catch(e){}
+  if(handle) fpIdbSet('h:'+meta.name,handle).catch(()=>{});
+}
+async function fpHistoryOpen(idx){
+  const entry=fpHistory()[idx];
+  if(!entry) return;
+  fpCloseSettings();
+  let h=null;
+  try{ h=await fpIdbGet('h:'+entry.name); }catch(e){}
+  if(h){
+    try{
+      let perm=await h.queryPermission({mode:'read'});
+      if(perm!=='granted') perm=await h.requestPermission({mode:'read'});
+      if(perm==='granted'){
+        window.__fpPendingHandle=h;
+        const f=await h.getFile();
+        handleFile(f);
+        return;
+      }
+    }catch(e){}
+  }
+  toast('📂 Accès direct indisponible — re-sélectionne « '+entry.name+' »');
+  fpOpenFile();
+}
+
+// ── Profil ────────────────────────────────────────────────────────────────
+function fpProfile(){ try{ return JSON.parse(localStorage.getItem('fp_profile')||'{}'); }catch(e){ return {}; } }
+function fpProfileSave(p){ try{ localStorage.setItem('fp_profile',JSON.stringify(p)); }catch(e){} fpSettingsBtnRefresh(); }
+function fpInitials(name){
+  const parts=String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return '';
+  return (parts[0][0]+(parts[1]?parts[1][0]:'')).toUpperCase();
+}
+
+// ── Bouton topbar ─────────────────────────────────────────────────────────
+function fpSettingsBtnRefresh(){
+  const b=document.getElementById('fp-settings-btn');
+  if(!b) return;
+  const ini=fpInitials(fpProfile().name);
+  b.innerHTML=ini
+    ? '<span style="width:26px;height:26px;border-radius:99px;background:var(--accent);color:#0d1b2a;display:inline-grid;place-items:center;font-size:11px;font-weight:900">'+esc(ini)+'</span>'
+    : '<span style="font-size:15px">⚙️</span>';
+}
+(function injectSettingsBtn(){
+  const target=document.querySelector('.tb-actions');
+  if(!target||document.getElementById('fp-settings-btn')) return;
+  const btn=document.createElement('button');
+  btn.id='fp-settings-btn';
+  btn.className='btn';
+  btn.title='Réglages';
+  btn.style.cssText='padding:5px 8px;line-height:1;display:inline-flex;align-items:center';
+  btn.onclick=fpOpenSettings;
+  target.appendChild(btn);
+  fpSettingsBtnRefresh();
+})();
+
+// ── Tiroir Réglages ───────────────────────────────────────────────────────
+function fpCloseSettings(){
+  const ov=document.getElementById('fp-settings-overlay');
+  if(ov){ ov.style.opacity='0'; const p=ov.querySelector('#fp-settings-panel'); if(p) p.style.transform='translateX(105%)'; setTimeout(()=>ov.remove(),200); }
+}
+function fpSettingsSection(title, inner){
+  return '<div style="margin-bottom:22px"><div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:10px">'+title+'</div>'+inner+'</div>';
+}
+function fpSettingsRefresh(){
+  const ov=document.getElementById('fp-settings-overlay');
+  if(ov) ov.remove();
+  fpOpenSettings(true);
+}
+function fpOpenSettings(instant){
+  if(document.getElementById('fp-settings-overlay')){ fpCloseSettings(); return; }
+  const ov=document.createElement('div');
+  ov.id='fp-settings-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:940;background:rgba(8,14,22,.5);backdrop-filter:blur(2px);opacity:0;transition:opacity .2s ease';
+  const prof=fpProfile();
+  const lang=(window.FP_getLang&&window.FP_getLang())||'fr';
+  const keys=fpAiKeys();
+  const active=fpAiActive();
+  const curSkin=(localStorage.getItem('fpTheme')||'light');
+
+  const histo=fpHistory();
+  const histoHtml=histo.length?histo.map((h,i)=>{
+    const d=new Date(h.date);
+    const when=d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    const size=h.size?(h.size>1048576?(h.size/1048576).toFixed(1)+' Mo':Math.round(h.size/1024)+' Ko'):'';
+    return '<button type="button" onclick="fpHistoryOpen('+i+')" style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;border:1px solid var(--border);background:var(--card2);border-radius:11px;padding:9px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit;transition:border-color .15s" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
+      +'<span style="font-size:15px">'+(h.hasHandle?'📂':'📄')+'</span>'
+      +'<span style="flex:1;min-width:0"><span style="display:block;font-size:12px;font-weight:700;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(h.name)+'</span>'
+      +'<span style="font-size:10px;color:var(--muted)">'+(h.sheet?esc(h.sheet)+' · ':'')+(h.rows?h.rows.toLocaleString('fr-FR')+' lignes · ':'')+when+(size?' · '+size:'')+'</span></span>'
+      +(h.hasHandle?'<span style="font-size:9px;font-weight:800;color:var(--green);background:var(--green-soft);border-radius:99px;padding:2px 7px;white-space:nowrap">direct</span>':'')
+      +'</button>';
+  }).join('')+'<button type="button" onclick="localStorage.removeItem(\'fp_file_history\');fpSettingsRefresh();" style="background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;text-decoration:underline;padding:2px 0;font-family:inherit">Vider l\'historique</button>'
+  :'<div style="font-size:11px;color:var(--muted)">Aucun fichier chargé pour l\'instant.</div>';
+
+  const aiHtml=Object.keys(FP_AI_PROVIDERS).map(pid=>{
+    const P=FP_AI_PROVIDERS[pid];
+    const hasKey=!!keys[pid];
+    return '<div style="border:1px solid '+(active===pid?'var(--accent)':'var(--border)')+';border-radius:12px;padding:10px 12px;margin-bottom:8px;background:'+(active===pid?'var(--accent-soft)':'var(--card2)')+'">'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:7px">'
+      +'<input type="radio" name="fp-ai-active" value="'+pid+'" '+(active===pid?'checked':'')+' style="accent-color:var(--accent)" onchange="fpAiSetActive(\''+pid+'\');fpSettingsRefreshAi()"/>'
+      +'<span style="font-size:12px;font-weight:800;color:var(--dark)">'+P.label+'</span>'
+      +'<span style="margin-left:auto;font-size:9px;color:var(--muted)">'+P.host+'</span>'
+      +'</label>'
+      +'<div style="display:flex;gap:6px">'
+      +'<input type="password" id="fp-ai-key-'+pid+'" placeholder="'+P.hint+'" value="'+(hasKey?esc(keys[pid]):'')+'" '
+      +'style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:11px;font-family:\'DM Mono\',monospace;outline:none;min-width:0"/>'
+      +'<button type="button" class="btn" style="padding:6px 10px;font-size:11px" onclick="fpSettingsTestKey(\''+pid+'\')">Tester</button>'
+      +'</div>'
+      +'<div id="fp-ai-status-'+pid+'" style="font-size:10px;margin-top:5px;min-height:13px;color:var(--muted)"></div>'
+      +'</div>';
+  }).join('');
+
+  ov.innerHTML='<div id="fp-settings-panel" style="position:absolute;top:0;right:0;bottom:0;width:min(420px,94vw);background:var(--card);border-left:1px solid var(--border);box-shadow:-24px 0 60px rgba(0,0,0,.35);display:flex;flex-direction:column;transform:translateX(105%);transition:transform .22s ease">'
+    +'<div style="background:var(--navy);padding:16px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
+    +'<span style="font-size:16px">⚙️</span><span style="font-weight:800;font-size:15px;color:#fff;font-family:\'Barlow Condensed\',sans-serif;font-size:19px;letter-spacing:.01em">Réglages</span>'
+    +'<button onclick="fpCloseSettings()" style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer;line-height:1">✕</button>'
+    +'</div>'
+    +'<div style="flex:1;overflow-y:auto;padding:20px">'
+    +fpSettingsSection('Profil de l\'utilisateur',
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">'
+      +'<span id="fp-prof-avatar" style="width:44px;height:44px;border-radius:99px;background:var(--accent);color:#0d1b2a;display:grid;place-items:center;font-weight:900;font-size:16px;flex-shrink:0">'+(fpInitials(prof.name)||'👤')+'</span>'
+      +'<div style="flex:1;display:flex;flex-direction:column;gap:6px">'
+      +'<input type="text" id="fp-prof-name" placeholder="Ton nom" value="'+esc(prof.name||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;outline:none"/>'
+      +'<input type="text" id="fp-prof-org" placeholder="Fonction / société (optionnel)" value="'+esc(prof.org||'')+'" style="border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;outline:none"/>'
+      +'</div></div>')
+    +fpSettingsSection('Langue',
+      '<div style="display:flex;gap:8px">'
+      +['fr','en'].map(l=>'<button type="button" class="btn" style="flex:1;justify-content:center;'+(lang===l?'border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:800':'')+'" onclick="window.FP_setLang&&FP_setLang(\''+l+'\');fpSettingsRefresh();">'+(l==='fr'?'🇫🇷 Français':'🇬🇧 English')+'</button>').join('')
+      +'</div>')
+    +fpSettingsSection('Historique des données', histoHtml)
+    +fpSettingsSection('Intelligence artificielle',
+      '<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Choisis le fournisseur actif et renseigne sa clé — « Tester » vérifie la clé auprès du fournisseur avant de charger tes données.</div>'+aiHtml)
+    +fpSettingsSection('Thème',
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+      +FP_SKINS.map(t=>'<button type="button" class="btn" style="justify-content:center;'+(curSkin===t.id?'border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:800':'')+'" onclick="fpApplyTheme(\''+t.id+'\');fpSettingsRefresh();">'+t.icon+' '+t.label+'</button>').join('')
+      +'</div>')
+    +'</div></div>';
+
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{ if(e.target===ov) fpCloseSettings(); });
+  if(instant===true){
+    ov.style.transition='none';
+    ov.style.opacity='1';
+    const p0=document.getElementById('fp-settings-panel');
+    if(p0){ p0.style.transition='none'; p0.style.transform='translateX(0)'; }
+  } else {
+    requestAnimationFrame(()=>{ ov.style.opacity='1'; const p=document.getElementById('fp-settings-panel'); if(p) p.style.transform='translateX(0)'; });
+  }
+
+  // profil : sauvegarde au fil de la frappe
+  ['fp-prof-name','fp-prof-org'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.addEventListener('input',()=>{
+      fpProfileSave({name:document.getElementById('fp-prof-name').value.trim(), org:document.getElementById('fp-prof-org').value.trim()});
+      const av=document.getElementById('fp-prof-avatar');
+      if(av) av.textContent=fpInitials(document.getElementById('fp-prof-name').value)||'👤';
+    });
+  });
+  // clés IA : sauvegarde à la saisie, test auto à la sortie du champ
+  Object.keys(FP_AI_PROVIDERS).forEach(pid=>{
+    const el=document.getElementById('fp-ai-key-'+pid);
+    if(!el) return;
+    el.addEventListener('change',()=>{ fpAiSetKey(pid,el.value.trim()); if(el.value.trim()) fpSettingsTestKey(pid); fpSettingsRefreshAi(); });
+  });
+}
+function fpSettingsRefreshAi(){
+  const active=fpAiActive();
+  Object.keys(FP_AI_PROVIDERS).forEach(pid=>{
+    const input=document.getElementById('fp-ai-key-'+pid);
+    if(!input) return;
+    const card=input.closest('div').parentNode;
+    card.style.borderColor=active===pid?'var(--accent)':'var(--border)';
+    card.style.background=active===pid?'var(--accent-soft)':'var(--card2)';
+  });
+}
+async function fpSettingsTestKey(pid){
+  const input=document.getElementById('fp-ai-key-'+pid);
+  const st=document.getElementById('fp-ai-status-'+pid);
+  if(!input||!st) return;
+  const key=input.value.trim();
+  if(!key){ st.textContent='Renseigne une clé d\'abord.'; st.style.color='var(--coral)'; return; }
+  fpAiSetKey(pid,key);
+  st.textContent='⏳ Vérification auprès de '+FP_AI_PROVIDERS[pid].host+'…';
+  st.style.color='var(--muted)';
+  const res=await fpAiTestKey(pid,key);
+  st.textContent=(res.ok?'✅ ':'❌ ')+res.message;
+  st.style.color=res.ok?'var(--green)':'var(--coral)';
+}
+
 </script>
 <script type="module">
 import { renderBar, renderBarPanel, readBarPanel } from './widgets/bar.js';
@@ -10865,32 +11154,11 @@ document.addEventListener('fp-lang-changed', function(){
   if(typeof window.buildFilterBar === 'function') window.buildFilterBar();
 });
 
-// Injecter le sélecteur de langue dans le header (à côté du logo/nav)
-(function injectLangSwitcher(){
-  const target = document.querySelector('.tb-actions');
-  if(target && !document.getElementById('fp-lang-switch')){
-    const switcher = createLangSwitcher();
-    switcher.style.marginRight = '10px';
-    target.insertBefore(switcher, target.firstChild);
-  }
-})();
-
-// Bouton mode sombre + restauration de la préférence
-(function injectThemeToggle(){
-  const target = document.querySelector('.tb-actions');
-  if(target && !document.getElementById('fp-theme-toggle')){
-    const btn=document.createElement('button');
-    btn.id='fp-theme-toggle';
-    btn.className='btn';
-    btn.textContent='🌙';
-    btn.title='Mode sombre';
-    btn.style.cssText='padding:7px 10px;font-size:14px;line-height:1';
-    btn.onclick=function(ev){ fpToggleThemeMenu(ev); };
-    target.insertBefore(btn, target.firstChild);
-  }
+// Restauration du thème sauvegardé (le choix se fait dans Réglages)
+(function restoreTheme(){
   let saved=null;
   try{ saved=localStorage.getItem('fpTheme'); }catch(e){}
-  if(saved==='dark') fpApplyTheme('dark');
+  if(saved&&saved!=='light') fpApplyTheme(saved);
 })();
 
 console.log('[FlowPilot] Modules bar.js + donut.js + i18n.js chargés');
