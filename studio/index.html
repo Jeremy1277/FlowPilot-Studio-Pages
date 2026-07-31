@@ -1236,6 +1236,14 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
             <div id="calc-col-samples" style="font-size:12px;color:var(--dark)"></div>
           </div>
           <div id="calc-col-err" style="display:none;color:var(--coral);font-size:12px;margin-top:8px"></div>
+          <!-- Mode manuel : écrire/coller la formule sans IA -->
+          <button type="button" id="calc-col-manual-toggle" onclick="calcColToggleManual()" style="background:none;border:none;color:var(--mid);font-size:11px;cursor:pointer;padding:0;margin-top:10px;text-decoration:underline;font-family:inherit">✍️ Écrire la formule moi-même (sans IA)</button>
+          <div id="calc-col-manual" style="display:none;margin-top:10px">
+            <textarea id="calc-col-manual-input" rows="3" spellcheck="false" placeholder='r => String(r["MA COLONNE"]||"").toUpperCase()'
+              style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11px;font-family:'DM Mono',monospace;resize:vertical;outline:none;box-sizing:border-box;background:var(--card2);color:var(--dark)"></textarea>
+            <div style="font-size:10px;color:var(--muted);margin-top:5px">Fonction JavaScript : <code>r</code> est la ligne, <code>r["Colonne"]</code> une valeur. <code>parseDateValue(v)</code> dispo pour les dates.</div>
+            <button class="btn" type="button" onclick="calcColTestManual()" style="margin-top:8px">▶ Tester la formule</button>
+          </div>
           <!-- Clé OpenAI manquante : saisie directement ici -->
           <div id="calc-col-key" style="display:none;margin-top:12px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:12px">
             <div style="font-size:12px;font-weight:800;margin-bottom:4px">🔑 Connexion IA requise</div>
@@ -10725,7 +10733,14 @@ La formule doit être robuste aux valeurs nulles/undefined.`;
     document.getElementById('calc-col-err').style.display = 'none';
 
   } catch(err) {
-    document.getElementById('calc-col-err').textContent = '❌ ' + err.message;
+    let msg='❌ '+err.message;
+    if(String(err.message)==='Failed to fetch'){
+      msg='❌ Impossible de joindre api.openai.com — réseau d\'entreprise, pare-feu ou extension qui bloque OpenAI ? '
+        +'En attendant, tu peux écrire la formule toi-même ci-dessous (sans IA).';
+      const mb=document.getElementById('calc-col-manual');
+      if(mb) mb.style.display='';
+    }
+    document.getElementById('calc-col-err').textContent = msg;
     document.getElementById('calc-col-err').style.display = '';
     if(String(err.message).indexOf('Clé OpenAI')===0){
       const kb=document.getElementById('calc-col-key');
@@ -10733,6 +10748,40 @@ La formule doit être robuste aux valeurs nulles/undefined.`;
     }
   } finally {
     btn.disabled = false; btn.textContent = '✨ Générer la formule';
+  }
+}
+
+function calcColToggleManual(){
+  const box=document.getElementById('calc-col-manual');
+  if(!box) return;
+  const show=box.style.display==='none';
+  box.style.display=show?'':'none';
+  if(show){ const ta=document.getElementById('calc-col-manual-input'); if(ta) setTimeout(()=>ta.focus(),50); }
+}
+
+function calcColTestManual(){
+  const err=document.getElementById('calc-col-err');
+  const ta=document.getElementById('calc-col-manual-input');
+  const formula=(ta?ta.value:'').trim();
+  if(!formula){ err.textContent='Écris une formule d\'abord.'; err.style.display=''; return; }
+  try{
+    const fn=new Function('r','parseDateValue','return ('+formula+')(r)');
+    const samples=rows.slice(0,5).map(r=>{
+      try{ return fn(r,parseDateValue); }catch(e){ return '⚠ '+e.message; }
+    });
+    _calcColFormula=formula;
+    const nums=samples.filter(v=>v!==''&&v!=null&&isFinite(parseFloat(String(v).replace(',','.'))));
+    _calcColType=(nums.length===samples.filter(v=>v!==''&&v!=null).length&&nums.length>0)?'number':'text';
+    document.getElementById('calc-col-formula').textContent=_calcColFormula;
+    document.getElementById('calc-col-samples').innerHTML=samples.map((v,i)=>
+      `<div style="padding:2px 0;border-bottom:1px solid var(--border)">Ligne ${i+1} → <strong>${esc(String(v??'—'))}</strong></div>`
+    ).join('');
+    document.getElementById('calc-col-preview').style.display='';
+    document.getElementById('calc-col-apply-btn').style.display='';
+    err.style.display='none';
+  }catch(e){
+    err.textContent='❌ Formule invalide : '+e.message;
+    err.style.display='';
   }
 }
 
