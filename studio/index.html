@@ -84,8 +84,35 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
   background:radial-gradient(circle,rgba(239,159,39,.26),rgba(239,159,39,.08) 36%,transparent 68%);
   filter:blur(16px);animation:intro-breathe 2.2s ease-in-out infinite;z-index:1
 }
+/* ── Séquence d'ouverture : 1) logo FP seul  2) explosion d'icônes  3) carte ── */
+.intro-boot{position:absolute;z-index:3;display:grid;place-items:center;transition:opacity .45s ease,transform .45s ease}
+#intro-screen.intro-stage3 .intro-boot{opacity:0;transform:scale(.7);pointer-events:none}
+.intro-boot-logo{
+  width:132px;height:132px;border-radius:34px;background:var(--accent);color:#0d1b2a;
+  display:grid;place-items:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:60px;line-height:1;
+  box-shadow:0 24px 70px rgba(239,159,39,.45),0 0 0 10px rgba(239,159,39,.10);
+  animation:intro-boot-pop 1s cubic-bezier(.34,1.56,.64,1) both
+}
+#intro-screen.intro-burst-go .intro-boot-logo{animation:intro-boot-pop 1s cubic-bezier(.34,1.56,.64,1) both,intro-boot-kick .55s ease}
+@keyframes intro-boot-pop{0%{opacity:0;transform:scale(.15) rotate(-14deg)}55%{opacity:1;transform:scale(1.12) rotate(4deg)}80%{transform:scale(.96) rotate(-1deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes intro-boot-kick{0%{transform:scale(1)}35%{transform:scale(1.16)}100%{transform:scale(1)}}
+.intro-burst{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:2}
+.intro-chip{
+  position:absolute;width:54px;height:54px;border-radius:16px;display:grid;place-items:center;color:#fff;opacity:0;
+  box-shadow:0 14px 34px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.25)
+}
+.intro-chip .ui-svg{width:26px;height:26px}
+#intro-screen.intro-burst-go .intro-chip{animation:intro-chip-fly 1.35s cubic-bezier(.18,.9,.32,1) var(--d,0s) both}
+@keyframes intro-chip-fly{
+  0%{opacity:0;transform:translate(0,0) scale(.2) rotate(0deg)}
+  12%{opacity:1}
+  55%{opacity:1;transform:translate(var(--tx),var(--ty)) scale(1) rotate(var(--rot))}
+  100%{opacity:0;transform:translate(calc(var(--tx)*1.55),calc(var(--ty)*1.55)) scale(.45) rotate(calc(var(--rot)*1.8))}
+}
 .intro-card{
-  position:relative;z-index:2;text-align:center;padding:34px;isolation:isolate;
+  position:relative;z-index:2;text-align:center;padding:34px;isolation:isolate;opacity:0
+}
+#intro-screen.intro-stage3 .intro-card{
   animation:intro-title-in .85s cubic-bezier(.16,1,.3,1) both
 }
 .intro-card::before{
@@ -96,9 +123,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
   backdrop-filter:blur(7px);z-index:-1
 }
 .intro-brand-lockup{
-  display:flex;align-items:center;justify-content:center;gap:28px;
-  animation:intro-title-in .95s cubic-bezier(.16,1,.3,1) .08s both
+  display:flex;align-items:center;justify-content:center;gap:28px;opacity:0
 }
+#intro-screen.intro-stage3 .intro-brand-lockup{animation:intro-title-in .95s cubic-bezier(.16,1,.3,1) .08s both}
 .intro-brand-logo{
   width:110px;height:110px;border-radius:28px;background:var(--accent);color:var(--navy);
   display:grid;place-items:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;
@@ -119,21 +146,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 .intro-loading{
   width:min(420px,70vw);margin:38px auto 0;height:7px;border-radius:999px;
   background:rgba(13,27,42,.14);overflow:hidden;position:relative;
-  box-shadow:inset 0 0 0 1px rgba(13,27,42,.08);
-  animation:intro-title-in .95s cubic-bezier(.16,1,.3,1) .28s both
+  box-shadow:inset 0 0 0 1px rgba(13,27,42,.08);opacity:0
 }
+#intro-screen.intro-stage3 .intro-loading{animation:intro-title-in .95s cubic-bezier(.16,1,.3,1) .28s both}
 .intro-loading span{
   position:absolute;inset:0;width:42%;border-radius:999px;
   background:linear-gradient(90deg,transparent,var(--accent),#ffe0a0,transparent);
   filter:drop-shadow(0 0 12px rgba(239,159,39,.85));animation:intro-loading 1.15s ease-in-out infinite
 }
-.intro-dots{display:flex;justify-content:center;gap:9px;margin-top:18px;animation:intro-title-in .95s cubic-bezier(.16,1,.3,1) .36s both}
+.intro-dots{display:flex;justify-content:center;gap:9px;margin-top:18px;opacity:0}
+#intro-screen.intro-stage3 .intro-dots{animation:intro-title-in .95s cubic-bezier(.16,1,.3,1) .36s both}
 .intro-dots span{width:8px;height:8px;border-radius:99px;background:var(--accent);box-shadow:0 0 15px rgba(239,159,39,.7);animation:intro-dot 1s ease-in-out infinite}
 .intro-dots span:nth-child(2){animation-delay:.16s}.intro-dots span:nth-child(3){animation-delay:.32s}
 .intro-hint{
   margin-top:22px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;color:rgba(13,27,42,.34);
-  letter-spacing:.16em;text-transform:uppercase;animation:intro-blink 1.4s ease-in-out infinite
+  letter-spacing:.16em;text-transform:uppercase;opacity:0
 }
+#intro-screen.intro-stage3 .intro-hint{animation:intro-blink 1.4s ease-in-out infinite}
 @keyframes intro-title-in{from{opacity:0;transform:translateY(18px) scale(.98);filter:blur(9px)}to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}}
 @keyframes intro-loading{0%{transform:translateX(-115%)}100%{transform:translateX(255%)}}
 @keyframes intro-dot{0%,70%,100%{transform:translateY(0);opacity:.35}35%{transform:translateY(-8px);opacity:1}}
@@ -141,6 +170,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 @keyframes intro-orbit{from{transform:translate3d(-2%,1%,0) rotate(0deg)}to{transform:translate3d(2%,-1%,0) rotate(8deg)}}
 @keyframes intro-grid{from{background-position:0 0,0 0}to{background-position:64px 64px,64px 64px}}
 @keyframes intro-blink{0%,100%{opacity:.35}50%{opacity:.9}}
+@media (prefers-reduced-motion:reduce){
+  .intro-boot,.intro-burst{display:none}
+  .intro-card,.intro-brand-lockup,.intro-loading,.intro-dots,.intro-hint{opacity:1;animation:none!important}
+}
 @media (max-width:760px){
   .intro-card::before{width:92vw;height:310px;border-radius:32px}
   .intro-brand-lockup{gap:16px;flex-direction:column}
@@ -1011,6 +1044,8 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
 <body>
 <div id="intro-screen" aria-label="Chargement FlowPilot Studio" onclick="skipIntroSplash()">
   <div class="intro-glow"></div>
+  <div class="intro-burst" id="intro-burst"></div>
+  <div class="intro-boot" id="intro-boot"><div class="intro-boot-logo">FP</div></div>
   <div class="intro-card">
     <div class="intro-brand-lockup">
       <div class="intro-brand-logo">FP</div>
@@ -1701,7 +1736,39 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
     }
   }
   window.skipIntroSplash=closeIntro;
-  setTimeout(closeIntro,2800);
+
+  // Séquence : logo FP (pop) -> explosion d'icônes widgets -> carte de marque
+  const scr=document.getElementById('intro-screen');
+  const burst=document.getElementById('intro-burst');
+  if(burst){
+    const chips=[
+      ['i-hero-bars','#EF9F27'],['i-trend','#4a7fa5'],['i-widgets','#1D9E75'],
+      ['i-layout','#7F77DD'],['i-data','#D85A30'],['i-truck','#38bdf8'],
+      ['i-users','#D4537E'],['i-finance','#85BC25'],['i-flash','#f0b840'],['i-design','#607287']
+    ];
+    chips.forEach(function(ic,i){
+      const a=(i/chips.length)*Math.PI*2-Math.PI/2+((i%2)?0.18:-0.12);
+      const r=170+((i*53)%95);
+      const d=document.createElement('div');
+      d.className='intro-chip';
+      d.style.background=ic[1];
+      d.style.setProperty('--tx',Math.round(Math.cos(a)*r)+'px');
+      d.style.setProperty('--ty',Math.round(Math.sin(a)*r)+'px');
+      d.style.setProperty('--rot',(((i%2)?1:-1)*(14+(i*7)%22))+'deg');
+      d.style.setProperty('--d',(i*0.03).toFixed(2)+'s');
+      d.innerHTML='<svg class="ui-svg"><use href="#'+ic[0]+'"></use></svg>';
+      burst.appendChild(d);
+    });
+  }
+  const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduceMotion||!scr){
+    if(scr) scr.classList.add('intro-stage3');
+    setTimeout(closeIntro,2400);
+  } else {
+    setTimeout(function(){ scr.classList.add('intro-burst-go'); },820);
+    setTimeout(function(){ scr.classList.add('intro-stage3'); },1650);
+    setTimeout(closeIntro,4400);
+  }
 })();
 
 // ── OPENAI KEY INIT ──────────────────────────────────────────────────────
