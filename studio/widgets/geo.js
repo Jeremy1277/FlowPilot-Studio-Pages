@@ -416,18 +416,72 @@ function rampColor(stops,t){
   const a=hexToRgb(stops[i]), b=hexToRgb(stops[i+1]);
   return "rgb("+Math.round(a[0]+(b[0]-a[0])*f)+","+Math.round(a[1]+(b[1]-a[1])*f)+","+Math.round(a[2]+(b[2]-a[2])*f)+")";
 }
-// Renvoie {fill(t), cssGradient} selon la palette du widget
+// Mode sombre actif ? (les rampes s'inversent : « plus » = plus lumineux sur fond noir)
+function geoIsDark(){
+  return !!(typeof document!=="undefined"&&document.body&&document.body.classList&&document.body.classList.contains("fp-dark"));
+}
+// hsl -> "rgb(...)" (h en degrés, s/l dans 0..1)
+function geoHslRgb(h,s,l){
+  var c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2;
+  var r=0,g=0,b=0;
+  if(h<60){r=c;g=x;} else if(h<120){r=x;g=c;} else if(h<180){g=c;b=x;}
+  else if(h<240){g=x;b=c;} else if(h<300){r=x;b=c;} else {r=c;b=x;}
+  function u(v){ return Math.round((v+m)*255); }
+  return "rgb("+u(r)+","+u(g)+","+u(b)+")";
+}
+// Ton « lumineux » pour les bulles en mode sombre : garde la teinte de la
+// palette mais force une saturation franche et une clarté qui monte avec t.
+function geoPointTone(color,t){
+  var s=String(color),r,g,b;
+  if(s[0]==="#"){ r=parseInt(s.slice(1,3),16)/255; g=parseInt(s.slice(3,5),16)/255; b=parseInt(s.slice(5,7),16)/255; }
+  else { var m=s.replace(/[^0-9.,]/g,"").split(","); if(m.length<3) return s; r=(+m[0])/255; g=(+m[1])/255; b=(+m[2])/255; }
+  var mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,h=0;
+  if(d>0){
+    if(mx===r) h=((g-b)/d+(g<b?6:0));
+    else if(mx===g) h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h*=60;
+  }
+  var l=(mx+mn)/2;
+  var sat=(d===0||l===0||l===1)?0:d/(1-Math.abs(2*l-1));
+  var S=Math.min(0.85,Math.max(0.62,sat));
+  var L=0.5+Math.max(0,Math.min(1,t))*0.12;
+  return geoHslRgb(h,S,L);
+}
+// Couleur de texte lisible posée sur une pastille de couleur donnée (rgb ou hex)
+function geoTextColorFor(fill){
+  var s=String(fill);
+  var r,g,b;
+  if(s[0]==="#"){ r=parseInt(s.slice(1,3),16); g=parseInt(s.slice(3,5),16); b=parseInt(s.slice(5,7),16); }
+  else { var m=s.replace(/[^0-9.,]/g,"").split(","); if(m.length<3) return "#ffffff"; r=+m[0]; g=+m[1]; b=+m[2]; }
+  var L=(0.299*r+0.587*g+0.114*b)/255;
+  return L>0.62?"#13293a":"#ffffff";
+}
+// Renvoie {fill(t), cssGradient} selon la palette du widget.
+// En mode sombre la rampe est retournée : les fortes valeurs prennent les tons
+// clairs et lumineux (lisibles sur fond nuit), les faibles les tons profonds.
 function geoColorScheme(w){
+  const dark=geoIsDark();
   const baseColor=(w.color&&w.color[0]==="#")?w.color:"#4a7fa5";
   const pal=(w.geoPalette&&w.geoPalette!=="perso")?(GEO_PALETTES[w.geoPalette]||GEO_PALETTES.ambre):null;
-  if(!w.geoPalette) return schemeFromPalette(GEO_PALETTES.ambre);       // défaut
-  if(pal) return schemeFromPalette(pal);
+  if(!w.geoPalette) return schemeFromPalette(GEO_PALETTES.ambre,dark);  // défaut
+  if(pal) return schemeFromPalette(pal,dark);
+  if(dark) return {                                                     // 'perso' sombre
+    fill:function(t){ return gradientShade(baseColor,Math.max(0.12,1-t)); },
+    point:function(t){ return geoPointTone(baseColor,t); },
+    cssGradient:"linear-gradient(90deg,"+gradientShade(baseColor,1)+","+gradientShade(baseColor,0.12)+")"
+  };
   return {                                                              // 'perso'
     fill:function(t){ return gradientShade(baseColor,Math.max(0.12,t)); },
     cssGradient:"linear-gradient(90deg,"+gradientShade(baseColor,0.12)+","+gradientShade(baseColor,1)+")"
   };
 }
-function schemeFromPalette(pal){
+function schemeFromPalette(pal,dark){
+  if(dark) return {
+    fill:function(t){ return rampColor(pal.stops,0.08+(1-Math.max(0,Math.min(1,t)))*0.84); },
+    point:function(t){ return geoPointTone(pal.stops[2],t); },
+    cssGradient:"linear-gradient(90deg,"+pal.stops.slice().reverse().join(",")+")"
+  };
   return {
     fill:function(t){ return rampColor(pal.stops,0.08+t*0.92); },
     cssGradient:"linear-gradient(90deg,"+pal.stops.join(",")+")"
@@ -939,10 +993,11 @@ function fpgeoInjectCSS(){
     '.fpgeo-hole{fill:rgba(255,255,255,.94)}',
     '/* ── mode sombre ── */',
     'body.fp-dark .fpgeo-stage{background:radial-gradient(130% 100% at 28% 8%,rgba(120,160,210,.10) 0%,rgba(0,0,0,0) 55%),linear-gradient(160deg,#101b2b 0%,#0d1724 55%,#0a1320 100%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}',
-    'body.fp-dark .fpgeo-land{stroke:#3e5471}',
-    'body.fp-dark .fpgeo-region{fill:#243144;stroke:#4c637f}',
-    'body.fp-dark .fpgeo-region:hover{filter:brightness(1.15)}',
-    'body.fp-dark .fpgeo-c{stroke:#1b2735}',
+    'body.fp-dark .fpgeo-land{stroke:#324459}',
+    'body.fp-dark .fpgeo-region{fill:#3d5678;stroke:#7b98bd}',
+    'body.fp-dark .fpgeo-region:hover{filter:brightness(1.12)}',
+    'body.fp-dark .fpgeo-c{stroke:#0f1926}',
+    'body.fp-dark .fpgeo-pt{stroke:rgba(238,246,255,.9)}',
     'body.fp-dark .fpgeo-lbl-name{fill:#e8eef6;stroke:rgba(10,16,26,.85)}',
     'body.fp-dark .fpgeo-lbl-val{fill:#ffffff;stroke:rgba(10,16,26,.9)}',
     'body.fp-dark .fpgeo-ptlbl-name{fill:#dce6f2;stroke:rgba(10,16,26,.85)}',
@@ -1182,8 +1237,8 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
   // ---- fond (contexte monde + découpage du pays) + couches de données ----
   const entryByFeature=isChoro?new Map(geo.entries.map(function(e){return [e.feature,e];})):null;
   const dataShapes=[];
-  const fpDark=!!(document.body&&document.body.classList&&document.body.classList.contains("fp-dark"));
-  const LAND_TINTS=fpDark?["#222f3f","#1e2a39","#1a2533"]:["#eef0f3","#e4e8ed","#dae0e8"];
+  const fpDark=geoIsDark();
+  const LAND_TINTS=fpDark?["#1c2836","#192331","#161f2c"]:["#eef0f3","#e4e8ed","#dae0e8"];
   ctxFs.forEach(function(f,i){
     const d=buildPath(f,fit.s,fit.tx,fit.ty);
     if(!d) return;
@@ -1283,7 +1338,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
     ptsSorted.forEach(function(pt,i){
       const t=tOf(pt.value);
       const r=ptsSorted.length===1?rMax*0.75:rMin+(rMax-rMin)*Math.sqrt(Math.max(0,t));
-      const fill=scheme.fill(0.5+t*0.5);
+      const fill=scheme.point?scheme.point(t):scheme.fill(0.5+t*0.5);
       const g=document.createElementNS(NS,"g");
       g.setAttribute("class","fpgeo-ptg");
       const gScale=document.createElementNS(NS,"g");
@@ -1318,13 +1373,14 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
         c=document.createElementNS(NS,"circle");
         c.setAttribute("class","fpgeo-pt");
         c.setAttribute("fill",fill);
-        c.setAttribute("fill-opacity","0.92");
+        c.setAttribute("fill-opacity",fpDark?"1":"0.92");
         c.setAttribute("r",r.toFixed(1));
         bub.appendChild(c);
       }
       const fs=Math.max(8,Math.min(13,r*0.75));
       const tv=document.createElementNS(NS,"text");
       tv.setAttribute("class",segsInfo?"fpgeo-ptlbl-vald":"fpgeo-ptlbl-val");
+      if(!segsInfo) tv.style.fill=geoTextColorFor(fill);
       tv.setAttribute("text-anchor","middle");
       tv.setAttribute("dy","3.2");
       tv.setAttribute("font-size",fs.toFixed(1));
