@@ -1027,6 +1027,7 @@ function fpgeoInjectCSS(){
 
 /* ── Point d'entrée ───────────────────────────────────────────────────── */
 
+const _introDone={};
 export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum, canvasId, breakdown){
   const el=document.getElementById(elId);
   if(!el) return;
@@ -1067,7 +1068,11 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
       return;
     }
     geo.breakdown=bd;
-    buildGeoScene(w, el, canvasId, chartInstances, fmtW, geo, 0, false);
+    // l'intro cinématique ne joue qu'au premier affichage du widget : les
+    // re-rendus (filtre croisé, édition, redimensionnement) repartent cadrés
+    const skipIntro=!!_introDone[canvasId];
+    _introDone[canvasId]=true;
+    buildGeoScene(w, el, canvasId, chartInstances, fmtW, geo, 0, skipIntro);
   }
 
   const mode=classifyGeoLabels(rawLabels);
@@ -1139,7 +1144,10 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       ? mercBounds(items.map(function(e){return e.feature;}),geo.clip)
       : pointMercBounds(items);
     dataB=expandBounds(dataB,isChoro?0.14:0.22);
-    dataB=ensureSpan(dataB,(refB[2]-refB[0])*0.16,(refB[3]-refB[1])*0.16);
+    // plancher absolu ~250 km : une ville isolée (filtre croisé, donnée unique)
+    // reste cadrée avec son environnement au lieu d'un zoom microscopique
+    const MIN_SPAN=0.04;
+    dataB=ensureSpan(dataB,Math.max((refB[2]-refB[0])*0.16,MIN_SPAN),Math.max((refB[3]-refB[1])*0.16,MIN_SPAN));
   }
   const fit=fitTransform(dataB,W,H,8);
   const fitAll=fitTransform(expandBounds(refB,0.05),W,H,8);
@@ -1184,6 +1192,36 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
     +'<button class="fpgeo-btn" data-act="out" title="Dézoomer" type="button">–</button>'
     +'<button class="fpgeo-btn" data-act="reset" title="Vue initiale" type="button" style="font-size:12px">⟲</button>';
   stage.appendChild(ctrls);
+
+  // ---- filtre croisé (clic sur une zone/bulle -> filtre les autres widgets)
+  // L'app fournit window.fpGeoSelect / window.fpGeoActiveSel ; absents dans
+  // l'export autonome, tout ceci devient inactif.
+  const cfSel=(typeof window!=="undefined"&&typeof window.fpGeoActiveSel==="function")?window.fpGeoActiveSel(w):null;
+  function cfMatch(lbls,name){
+    if(!cfSel) return true;
+    const v=String(cfSel.val);
+    if(lbls&&lbls.length){ for(let i=0;i<lbls.length;i++) if(String(lbls[i])===v) return true; return false; }
+    return String(name)===v;
+  }
+  function cfEmit(lbls,name){
+    if(typeof window==="undefined"||typeof window.fpGeoSelect!=="function") return;
+    if(lbls===null&&name===null){ window.fpGeoSelect(w,null); return; }
+    const uniq=[]; const seenL={};
+    (lbls||[]).forEach(function(l){ const s=String(l); if(!seenL[s]&&uniq.length<60){ seenL[s]=1; uniq.push(s); } });
+    window.fpGeoSelect(w,{labels:uniq,name:name});
+  }
+  const cfOn=(typeof window!=="undefined"&&typeof window.fpGeoSelect==="function");
+  let downX=0,downY=0;
+  function isDragClick(e){ return Math.abs(e.clientX-downX)>6||Math.abs(e.clientY-downY)>6; }
+  if(cfOn){
+    stage.addEventListener("pointerdown",function(e){ downX=e.clientX; downY=e.clientY; },true);
+    // clic dans le vide (océan / pays sans donnée) -> retire le filtre de ce widget
+    stage.addEventListener("click",function(e){
+      if(isDragClick(e)) return;
+      if(e.target&&e.target.closest&&e.target.closest(".fpgeo-btn")) return;
+      cfEmit(null,null);
+    });
+  }
 
   // ---- état zoom/pan ------------------------------------------------------
   let z={k:1,tx:0,ty:0};
@@ -1274,6 +1312,15 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       const fill=scheme.fill(tOf(entry.value));
       p.setAttribute("class","fpgeo-c");
       p.setAttribute("fill",fill);
+      if(cfOn){
+        p.style.cursor="pointer";
+        if(!cfMatch(entry.labels,entry.name)) p.style.opacity="0.3";
+        p.addEventListener("click",function(e){
+          if(isDragClick(e)) return;
+          e.stopPropagation();
+          cfEmit(entry.labels,entry.name);
+        });
+      }
       gData.appendChild(p);
       dataShapes.push({p:p,entry:entry,fill:fill});
     } else {
@@ -1437,6 +1484,14 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
         g.classList.remove("fpgeo-hover");
         tip.classList.remove("fpgeo-tip-on");
       });
+      if(cfOn){
+        if(!cfMatch(pt.labels,pt.name)) g.style.opacity="0.3";
+        g.addEventListener("click",function(e){
+          if(isDragClick(e)) return;
+          e.stopPropagation();
+          cfEmit(pt.labels,pt.name);
+        });
+      }
     });
   }
 
