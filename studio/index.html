@@ -641,6 +641,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 .table-wrap th{padding:7px 10px;background:var(--navy);color:rgba(255,255,255,.7);text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;position:sticky;top:0;z-index:2}
 .table-wrap td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--dark);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis}
 .table-wrap tr:nth-child(even) td{background:var(--card2)}
+.table-wrap tbody tr[data-cfv]{cursor:pointer}
+.table-wrap tbody tr[data-cfv]:hover td{background:var(--accent-soft)}
+.table-wrap tbody tr.fp-cf-selrow td{background:var(--accent-soft)!important;font-weight:700;color:var(--accent)}
 
 /* TOAST */
 #toast{position:fixed;bottom:18px;right:18px;background:var(--navy);color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:11px 16px;font-size:12px;font-weight:700;box-shadow:0 18px 40px rgba(13,27,42,.24);transform:translateY(80px);opacity:0;transition:transform .22s,opacity .22s;z-index:500;pointer-events:none}
@@ -2334,13 +2337,35 @@ function renderTableHTML(selectedCols,defaultColCount=5,tableMode,tableAggr){
   const colHead=c=>tableData.aggr&&tableData.measureCols.includes(c)
     ? (TABLE_AGGR_LABELS[tableData.aggr]||tableData.aggr)+' · '+colLabel(c)
     : colLabel(c);
+  // colonne portée par le clic-filtre : 1re dimension affichée
+  const cfCol=tableData.dimensionCols&&tableData.dimensionCols.length?tableData.dimensionCols[0]:null;
   let html=`<div class="table-status">${status}</div>`;
   html+='<div class="table-wrap"><table><thead><tr>'+cols.map(c=>`<th>${esc(colHead(c))}</th>`).join('')+'</tr></thead><tbody>';
   tableData.displayRows.forEach(r=>{
-    html+=`<tr>${cols.map(c=>`<td>${esc(formatTableCell(c,r[c],tableData.isAggregated,tableData.measureCols))}</td>`).join('')}</tr>`;
+    const cfv=cfCol?` data-cfv="${esc(String(r[cfCol]??''))}"`:'';
+    html+=`<tr${cfv}>${cols.map(c=>`<td>${esc(formatTableCell(c,r[c],tableData.isAggregated,tableData.measureCols))}</td>`).join('')}</tr>`;
   });
   html+='</tbody></table></div>';
   return html;
+}
+
+// Clic sur une ligne du tableau -> filtre croisé sur la 1re colonne dimension
+function fpWireTableCf(w,el){
+  if(typeof window.fpCfToggle!=='function') return;
+  const body=el.querySelector('tbody'); if(!body) return;
+  const trs=body.querySelectorAll('tr[data-cfv]'); if(!trs.length) return;
+  const cols=w.tableCols?.length?w.tableCols:columns.slice(0,5).map(c=>c.name);
+  let cfCol;
+  if((w.tableMode||'auto')==='group') cfCol=cols[0];
+  else { const dims=cols.filter(c=>!isMeasureColumn(c)); cfCol=dims.length?dims[0]:null; }
+  if(!cfCol) return;
+  const act=(typeof window.fpCfActive==='function')?window.fpCfActive(w.id):null;
+  trs.forEach(tr=>{
+    if(act&&String(act.val)===tr.getAttribute('data-cfv')) tr.classList.add('fp-cf-selrow');
+    tr.addEventListener('click',function(){
+      window.fpCfToggle(w.id,cfCol,tr.getAttribute('data-cfv'));
+    });
+  });
 }
 
 function fmtNum(n){
@@ -4087,6 +4112,7 @@ function renderWidgetBody(w, containerId, isPreview){
   if(w.type==='table'){
     const cols=w.tableCols?.length?w.tableCols:columns.slice(0,5).map(c=>c.name);
     el.innerHTML=renderTableHTML(cols,5,w.tableMode,w.tableAggr);
+    if(!isPreview) fpWireTableCf(w,el);
     return;
   }
 
@@ -7428,10 +7454,14 @@ function fpgeoInjectCSS(){
 /* ── Point d'entrée ───────────────────────────────────────────────────── */
 
 const _introDone={};
+// Jeton de génération par widget : un rendu lent (chargement des fonds/villes)
+// ne doit jamais écraser un rendu plus récent (filtre croisé, filtre date…).
+const _geoSeq={};
 function fpRenderGeoApp(w, elId, rawLabels, rawValues, chartInstances, fmtNum, canvasId, breakdown){
   const el=document.getElementById(elId);
   if(!el) return;
   if(!canvasId) canvasId="cvg"+w.id.replace(/[^a-zA-Z0-9]/g,"");
+  const seq=_geoSeq[canvasId]=(_geoSeq[canvasId]||0)+1;
   fpgeoInjectCSS();
 
   if(!w.col){
@@ -7459,10 +7489,12 @@ function fpRenderGeoApp(w, elId, rawLabels, rawValues, chartInstances, fmtNum, c
     +'</div>';
 
   function fail(){
+    if(_geoSeq[canvasId]!==seq) return; // un rendu plus récent a pris la main
     el.innerHTML='<div class="wc-empty"><div class="we-icon">⚠️</div><div>Impossible de charger le fond de carte</div></div>';
   }
   const bd=(breakdown&&breakdown.cats&&breakdown.cats.length&&breakdown.byPlace)?breakdown:null;
   function start(geo){
+    if(_geoSeq[canvasId]!==seq) return; // un rendu plus récent a pris la main
     if(geo.error){
       el.innerHTML='<div class="wc-empty"><div class="we-icon">🌍</div><div>'+geo.error+'</div></div>';
       return;
@@ -7472,7 +7504,7 @@ function fpRenderGeoApp(w, elId, rawLabels, rawValues, chartInstances, fmtNum, c
     // re-rendus (filtre croisé, édition, redimensionnement) repartent cadrés
     const skipIntro=!!_introDone[canvasId];
     _introDone[canvasId]=true;
-    buildGeoScene(w, el, canvasId, chartInstances, fmtW, geo, 0, skipIntro);
+    buildGeoScene(w, el, canvasId, chartInstances, fmtW, geo, 0, skipIntro, seq);
   }
 
   const mode=classifyGeoLabels(rawLabels);
@@ -7508,12 +7540,13 @@ function fpRenderGeoApp(w, elId, rawLabels, rawValues, chartInstances, fmtNum, c
 
 /* ── Construction de la scène (choroplèthe ou bulles) ─────────────────── */
 
-function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, skipIntro){
+function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, skipIntro, seq){
+  if(seq!=null&&_geoSeq[canvasId]!==seq) return; // rendu obsolète
   const stage=document.getElementById(canvasId+"-stage");
   if(!stage) return;
   const W=stage.clientWidth, H=stage.clientHeight;
   if((W<40||H<40)&&attempt<12){
-    requestAnimationFrame(function(){ buildGeoScene(w,el,canvasId,chartInstances,fmtNum,geo,attempt+1,skipIntro); });
+    requestAnimationFrame(function(){ buildGeoScene(w,el,canvasId,chartInstances,fmtNum,geo,attempt+1,skipIntro,seq); });
     return;
   }
 
@@ -8105,7 +8138,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       dead=true; try{ro.disconnect();}catch(e){}
       if(introRaf) cancelAnimationFrame(introRaf);
       if(zoomRaf) cancelAnimationFrame(zoomRaf);
-      buildGeoScene(w,el,canvasId,chartInstances,fmtNum,geo,0,true);
+      buildGeoScene(w,el,canvasId,chartInstances,fmtNum,geo,0,true,seq);
     },160);
   });
   ro.observe(stage);
@@ -9170,8 +9203,10 @@ function cfRerender(){
     var el=document.getElementById('wb-'+w.id);
     if(!el) return;
     var or=rows, of=filteredRows;
-    var cfR=cfRowsExcluding(w.id);
-    if(cfR){ rows=cfR; filteredRows=null; }
+    // contexte effectif : filtres croisés (déjà combinés au filtre date) ou,
+    // à défaut, le filtre date seul — jamais les lignes brutes
+    var eff=cfRowsExcluding(w.id)||of;
+    if(eff){ rows=eff; filteredRows=null; }
     renderWidgetBody(w,'wb-'+w.id,false);
     rows=or; filteredRows=of;
   });
@@ -9208,6 +9243,9 @@ window.fpGeoActiveSel=function(w){
   var f=cfFilters.find(function(x){return x.wid===w.id;});
   return f||null;
 };
+// Hooks génériques (tableau, futurs widgets) : mêmes règles que cfToggle
+window.fpCfToggle=function(wid,col,val,vals){ cfToggle(wid,col,val,vals||null); };
+window.fpCfActive=function(wid){ return cfFilters.find(function(x){return x.wid===wid;})||null; };
 
 // Surbrillance : dans son propre widget-source, on assombrit tout sauf le segment sélectionné
 function cfDimColor(c){
@@ -9243,7 +9281,8 @@ function cfPatch(w){
   if(chart.__cfB) chart.canvas.removeEventListener('click',chart.__cfB);
   chart.__cfB=function(evt){
     evt.stopPropagation();
-    var pts=chart.getElementsAtEventForMode(evt,'nearest',{intersect:true},false);
+    // courbe : les points sont minuscules -> sélection au point le plus proche du clic
+    var pts=chart.getElementsAtEventForMode(evt,'nearest',{intersect:w.type!=='line'},false);
     if(!pts.length){
       if(cfFilters.some(function(f){return f.wid===w.id;})) cfClearOne(w.id);
       return;

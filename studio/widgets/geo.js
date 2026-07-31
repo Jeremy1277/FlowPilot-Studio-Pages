@@ -1038,10 +1038,14 @@ function fpgeoInjectCSS(){
 /* ── Point d'entrée ───────────────────────────────────────────────────── */
 
 const _introDone={};
+// Jeton de génération par widget : un rendu lent (chargement des fonds/villes)
+// ne doit jamais écraser un rendu plus récent (filtre croisé, filtre date…).
+const _geoSeq={};
 export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum, canvasId, breakdown){
   const el=document.getElementById(elId);
   if(!el) return;
   if(!canvasId) canvasId="cvg"+w.id.replace(/[^a-zA-Z0-9]/g,"");
+  const seq=_geoSeq[canvasId]=(_geoSeq[canvasId]||0)+1;
   fpgeoInjectCSS();
 
   if(!w.col){
@@ -1069,10 +1073,12 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
     +'</div>';
 
   function fail(){
+    if(_geoSeq[canvasId]!==seq) return; // un rendu plus récent a pris la main
     el.innerHTML='<div class="wc-empty"><div class="we-icon">⚠️</div><div>Impossible de charger le fond de carte</div></div>';
   }
   const bd=(breakdown&&breakdown.cats&&breakdown.cats.length&&breakdown.byPlace)?breakdown:null;
   function start(geo){
+    if(_geoSeq[canvasId]!==seq) return; // un rendu plus récent a pris la main
     if(geo.error){
       el.innerHTML='<div class="wc-empty"><div class="we-icon">🌍</div><div>'+geo.error+'</div></div>';
       return;
@@ -1082,7 +1088,7 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
     // re-rendus (filtre croisé, édition, redimensionnement) repartent cadrés
     const skipIntro=!!_introDone[canvasId];
     _introDone[canvasId]=true;
-    buildGeoScene(w, el, canvasId, chartInstances, fmtW, geo, 0, skipIntro);
+    buildGeoScene(w, el, canvasId, chartInstances, fmtW, geo, 0, skipIntro, seq);
   }
 
   const mode=classifyGeoLabels(rawLabels);
@@ -1118,12 +1124,13 @@ export function renderGeo(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
 
 /* ── Construction de la scène (choroplèthe ou bulles) ─────────────────── */
 
-function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, skipIntro){
+function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, skipIntro, seq){
+  if(seq!=null&&_geoSeq[canvasId]!==seq) return; // rendu obsolète
   const stage=document.getElementById(canvasId+"-stage");
   if(!stage) return;
   const W=stage.clientWidth, H=stage.clientHeight;
   if((W<40||H<40)&&attempt<12){
-    requestAnimationFrame(function(){ buildGeoScene(w,el,canvasId,chartInstances,fmtNum,geo,attempt+1,skipIntro); });
+    requestAnimationFrame(function(){ buildGeoScene(w,el,canvasId,chartInstances,fmtNum,geo,attempt+1,skipIntro,seq); });
     return;
   }
 
@@ -1715,7 +1722,7 @@ function buildGeoScene(w, el, canvasId, chartInstances, fmtNum, geo, attempt, sk
       dead=true; try{ro.disconnect();}catch(e){}
       if(introRaf) cancelAnimationFrame(introRaf);
       if(zoomRaf) cancelAnimationFrame(zoomRaf);
-      buildGeoScene(w,el,canvasId,chartInstances,fmtNum,geo,0,true);
+      buildGeoScene(w,el,canvasId,chartInstances,fmtNum,geo,0,true,seq);
     },160);
   });
   ro.observe(stage);
