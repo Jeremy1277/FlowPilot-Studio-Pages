@@ -1521,6 +1521,26 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
       <div id="modal-table-wrap" style="display:none">
         <label class="m-label">Colonnes à afficher <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(clique pour sélectionner)</span></label>
         <div class="tcol-grid" id="modal-table-cols"></div>
+        <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap">
+          <div style="flex:1.4;min-width:170px">
+            <label class="m-label">Mode d'affichage</label>
+            <select class="m-input" id="modal-table-mode" onchange="onModalTableModeChange()">
+              <option value="auto">Automatique</option>
+              <option value="raw">Détail — lignes brutes</option>
+              <option value="group">Synthèse — regroupé par la 1re colonne</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:130px" id="modal-table-aggr-wrap">
+            <label class="m-label">Agrégat</label>
+            <select class="m-input" id="modal-table-aggr">
+              <option value="count">Nombre</option>
+              <option value="sum">Somme</option>
+              <option value="avg">Moyenne</option>
+              <option value="min">Min</option>
+              <option value="max">Max</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <!-- Courbe de tendance (bar + line) -->
@@ -2216,10 +2236,51 @@ function isNumericColumn(colName){
   return columns.find(c=>c.name===colName)?.type==='number';
 }
 
-function buildTableData(selectedCols){
+const TABLE_AGGR_LABELS={count:'Nombre',sum:'Somme',avg:'Moyenne',min:'Min',max:'Max'};
+function buildTableData(selectedCols,tableMode,tableAggr){
   const cols=(selectedCols&&selectedCols.length)?selectedCols:columns.slice(0,5).map(c=>c.name);
   const measureCols=cols.filter(c=>isMeasureColumn(c));
   const dimensionCols=cols.filter(c=>!isMeasureColumn(c));
+  const mode=tableMode||'auto';
+
+  // Mode « Synthèse » : regroupé par la 1re colonne, les autres agrégées
+  // (nombre / somme / moyenne / min / max). Exemple : Pays + DA en « Nombre »
+  // = nombre de DA par pays, même si DA est un identifiant.
+  if(mode==='group' && cols.length>=2){
+    const aggr=tableAggr||'count';
+    return cachedAggregation(['tableGrp',aggr,cols.join('¦')].join('§'),()=>{
+      const gcol=cols[0], vcols=cols.slice(1);
+      const map=new Map();
+      rows.forEach(r=>{
+        const key=String(r[gcol]??'—');
+        if(!map.has(key)){
+          const o={__count:0,__vals:{}};
+          o[gcol]=r[gcol]??'—';
+          vcols.forEach(c=>o.__vals[c]=[]);
+          map.set(key,o);
+        }
+        const o=map.get(key);
+        o.__count++;
+        vcols.forEach(c=>{
+          const v=r[c];
+          if(v!=null&&String(v).trim()!=='') o.__vals[c].push(v);
+        });
+      });
+      const fullRows=[...map.values()].map(o=>{
+        vcols.forEach(c=>{ o[c]=aggr==='count'?o.__vals[c].length:aggregate(o.__vals[c],aggr); });
+        delete o.__vals;
+        return o;
+      }).sort((a,b)=>parseNumValue(b[vcols[0]])-parseNumValue(a[vcols[0]]));
+      const displayRows=fullRows.slice(0,MAX_AGG_TABLE_ROWS);
+      return {cols,displayRows,isAggregated:true,measureCols:vcols,dimensionCols:[gcol],sourceCount:rows.length,totalRows:fullRows.length,isLimited:fullRows.length>displayRows.length,aggr};
+    });
+  }
+
+  // Mode « Détail » : lignes brutes, jamais consolidées
+  if(mode==='raw'){
+    const displayRows=rows.slice(0,MAX_TABLE_ROWS);
+    return {cols,displayRows,isAggregated:false,measureCols,dimensionCols,sourceCount:rows.length,totalRows:rows.length,isLimited:rows.length>displayRows.length};
+  }
 
   // Règle métier V4.5 : si un tableau mélange au moins une dimension texte
   // et au moins une mesure numérique, on consolide automatiquement les mesures
@@ -2263,15 +2324,18 @@ function formatTableCell(colName,value,isAggregated,measureCols){
   return String(value??'');
 }
 
-function renderTableHTML(selectedCols,defaultColCount=5){
+function renderTableHTML(selectedCols,defaultColCount=5,tableMode,tableAggr){
   const cols=(selectedCols&&selectedCols.length)?selectedCols:columns.slice(0,defaultColCount).map(c=>c.name);
-  const tableData=buildTableData(cols);
+  const tableData=buildTableData(cols,tableMode,tableAggr);
   const status=tableData.isAggregated
     ? `${tableData.displayRows.length.toLocaleString()}${tableData.isLimited?' / '+tableData.totalRows.toLocaleString():''} lignes consolidées · ${tableData.sourceCount.toLocaleString()} lignes sources`
     : `${tableData.displayRows.length.toLocaleString()}${tableData.isLimited?' / '+tableData.sourceCount.toLocaleString():''} lignes affichées${tableData.isLimited?' · affichage limité pour garder l’application fluide':''}`;
 
+  const colHead=c=>tableData.aggr&&tableData.measureCols.includes(c)
+    ? (TABLE_AGGR_LABELS[tableData.aggr]||tableData.aggr)+' · '+colLabel(c)
+    : colLabel(c);
   let html=`<div class="table-status">${status}</div>`;
-  html+='<div class="table-wrap"><table><thead><tr>'+cols.map(c=>`<th>${esc(colLabel(c))}</th>`).join('')+'</tr></thead><tbody>';
+  html+='<div class="table-wrap"><table><thead><tr>'+cols.map(c=>`<th>${esc(colHead(c))}</th>`).join('')+'</tr></thead><tbody>';
   tableData.displayRows.forEach(r=>{
     html+=`<tr>${cols.map(c=>`<td>${esc(formatTableCell(c,r[c],tableData.isAggregated,tableData.measureCols))}</td>`).join('')}</tr>`;
   });
@@ -3666,7 +3730,19 @@ function buildColSelects(w){
 
   // Table cols
   buildTableColsPicker(w?.tableCols);
+  const tmSel=document.getElementById('modal-table-mode');
+  const taSel=document.getElementById('modal-table-aggr');
+  if(tmSel) tmSel.value=w?.tableMode||'auto';
+  if(taSel) taSel.value=w?.tableAggr||'count';
+  onModalTableModeChange();
 }
+
+function onModalTableModeChange(){
+  const tm=document.getElementById('modal-table-mode');
+  const wrap=document.getElementById('modal-table-aggr-wrap');
+  if(tm&&wrap) wrap.style.display=tm.value==='group'?'':'none';
+}
+window.onModalTableModeChange=onModalTableModeChange;
 
 function buildTableColsPicker(selected){
   const grid=document.getElementById('modal-table-cols');
@@ -3795,6 +3871,8 @@ function saveWidget(){
     aggr: modalSelAggr, aggrKpi: modalSelKpiAggr, aggrGauge: modalSelGaugeAggr,
     kpiCol, gaugeCol, gaugeMin, gaugeTarget, gaugeMax,
     tableCols: [...modalTableCols],
+    tableMode: document.getElementById('modal-table-mode')?.value||'auto',
+    tableAggr: document.getElementById('modal-table-aggr')?.value||'count',
     height: existing?.height,
     widthCols: existing?.widthCols||4,
     _customTitle: !!title,
@@ -4008,7 +4086,7 @@ function renderWidgetBody(w, containerId, isPreview){
 
   if(w.type==='table'){
     const cols=w.tableCols?.length?w.tableCols:columns.slice(0,5).map(c=>c.name);
-    el.innerHTML=renderTableHTML(cols,5);
+    el.innerHTML=renderTableHTML(cols,5,w.tableMode,w.tableAggr);
     return;
   }
 
@@ -4324,7 +4402,7 @@ function renderZoomBody(w, containerId){
 
   if(w.type==='table'){
     const cols=w.tableCols?.length?w.tableCols:columns.slice(0,6).map(c=>c.name);
-    el.innerHTML=renderTableHTML(cols,6);
+    el.innerHTML=renderTableHTML(cols,6,w.tableMode,w.tableAggr);
     return;
   }
 
@@ -8087,9 +8165,10 @@ function renderGeoWidget(w,el,wi,labels,values,color){
 function parseNumValue(v){const n=parseFloat(String(v??'').replace(/\s/g,'').replace(',','.'));return isNaN(n)?0:n}
 function isNumericColumn(colName){const c=columns.find(x=>x.name===colName);return c&&c.type==='number'}
 function isMeasureColumn(colName){return (fieldModels[colName]&&fieldModels[colName].role==='measure')||(!fieldModels[colName]&&isNumericColumn(colName))}
-function buildTableData(selectedCols){const cols=(selectedCols&&selectedCols.length)?selectedCols:columns.slice(0,5).map(c=>c.name);const measureCols=cols.filter(c=>isMeasureColumn(c));const dimensionCols=cols.filter(c=>!isMeasureColumn(c));if(measureCols.length&&dimensionCols.length){return cachedAggregation(['tableAgg',cols.join('¦')].join('§'),()=>{const map=new Map();rows.forEach(r=>{const key=dimensionCols.map(c=>String(r[c]??'—')).join('§§');if(!map.has(key)){const obj={__count:0};dimensionCols.forEach(c=>obj[c]=r[c]??'—');measureCols.forEach(c=>obj[c]=0);map.set(key,obj)}const obj=map.get(key);measureCols.forEach(c=>obj[c]+=parseNumValue(r[c]));obj.__count++});const firstMeasure=measureCols[0];const fullRows=[...map.values()].sort((a,b)=>parseNumValue(b[firstMeasure])-parseNumValue(a[firstMeasure]));const displayRows=fullRows.slice(0,MAX_AGG_TABLE_ROWS);return {cols:cols,displayRows:displayRows,isAggregated:true,measureCols:measureCols,dimensionCols:dimensionCols,sourceCount:rows.length,totalRows:fullRows.length,isLimited:fullRows.length>displayRows.length}})}const displayRows=rows.slice(0,MAX_TABLE_ROWS);return {cols:cols,displayRows:displayRows,isAggregated:false,measureCols:measureCols,dimensionCols:dimensionCols,sourceCount:rows.length,totalRows:rows.length,isLimited:rows.length>displayRows.length}}
+var TABLE_AGGR_LABELS={count:'Nombre',sum:'Somme',avg:'Moyenne',min:'Min',max:'Max'};
+function buildTableData(selectedCols,tableMode,tableAggr){const cols=(selectedCols&&selectedCols.length)?selectedCols:columns.slice(0,5).map(c=>c.name);const measureCols=cols.filter(c=>isMeasureColumn(c));const dimensionCols=cols.filter(c=>!isMeasureColumn(c));const mode=tableMode||'auto';if(mode==='group'&&cols.length>=2){const aggr=tableAggr||'count';return cachedAggregation(['tableGrp',aggr,cols.join('¦')].join('§'),()=>{const gcol=cols[0],vcols=cols.slice(1);const map=new Map();rows.forEach(r=>{const key=String(r[gcol]??'—');if(!map.has(key)){const o={__count:0,__vals:{}};o[gcol]=r[gcol]??'—';vcols.forEach(c=>o.__vals[c]=[]);map.set(key,o)}const o=map.get(key);o.__count++;vcols.forEach(c=>{const v=r[c];if(v!=null&&String(v).trim()!=='')o.__vals[c].push(v)})});const fullRows=[...map.values()].map(o=>{vcols.forEach(c=>{o[c]=aggr==='count'?o.__vals[c].length:aggregate(o.__vals[c],aggr)});delete o.__vals;return o}).sort((a,b)=>parseNumValue(b[vcols[0]])-parseNumValue(a[vcols[0]]));const displayRows=fullRows.slice(0,MAX_AGG_TABLE_ROWS);return {cols:cols,displayRows:displayRows,isAggregated:true,measureCols:vcols,dimensionCols:[gcol],sourceCount:rows.length,totalRows:fullRows.length,isLimited:fullRows.length>displayRows.length,aggr:aggr}})}if(mode==='raw'){const displayRows=rows.slice(0,MAX_TABLE_ROWS);return {cols:cols,displayRows:displayRows,isAggregated:false,measureCols:measureCols,dimensionCols:dimensionCols,sourceCount:rows.length,totalRows:rows.length,isLimited:rows.length>displayRows.length}}if(measureCols.length&&dimensionCols.length){return cachedAggregation(['tableAgg',cols.join('¦')].join('§'),()=>{const map=new Map();rows.forEach(r=>{const key=dimensionCols.map(c=>String(r[c]??'—')).join('§§');if(!map.has(key)){const obj={__count:0};dimensionCols.forEach(c=>obj[c]=r[c]??'—');measureCols.forEach(c=>obj[c]=0);map.set(key,obj)}const obj=map.get(key);measureCols.forEach(c=>obj[c]+=parseNumValue(r[c]));obj.__count++});const firstMeasure=measureCols[0];const fullRows=[...map.values()].sort((a,b)=>parseNumValue(b[firstMeasure])-parseNumValue(a[firstMeasure]));const displayRows=fullRows.slice(0,MAX_AGG_TABLE_ROWS);return {cols:cols,displayRows:displayRows,isAggregated:true,measureCols:measureCols,dimensionCols:dimensionCols,sourceCount:rows.length,totalRows:fullRows.length,isLimited:fullRows.length>displayRows.length}})}const displayRows=rows.slice(0,MAX_TABLE_ROWS);return {cols:cols,displayRows:displayRows,isAggregated:false,measureCols:measureCols,dimensionCols:dimensionCols,sourceCount:rows.length,totalRows:rows.length,isLimited:rows.length>displayRows.length}}
 function formatTableCell(colName,value,isAggregated,measureCols){if(isAggregated&&measureCols.includes(colName))return parseNumValue(value).toLocaleString('fr-FR',{maximumFractionDigits:2});var col=(typeof columns!=='undefined'?columns:[]).find(function(c){return c.name===colName;});if(col&&col.type==='date'){var df=(typeof colDisplayFormats!=='undefined'?colDisplayFormats:{})[colName]||'date_short';return(typeof formatDateDisplay==='function'?formatDateDisplay(value,df):String(value??''));}return String(value??'')}
-function renderTableHTML(selectedCols,defaultColCount){const cols=(selectedCols&&selectedCols.length)?selectedCols:columns.slice(0,(defaultColCount||5)).map(c=>c.name);const tableData=buildTableData(cols);const status=tableData.isAggregated?tableData.displayRows.length.toLocaleString()+(tableData.isLimited?' / '+tableData.totalRows.toLocaleString():'')+' lignes consolidées · '+tableData.sourceCount.toLocaleString()+' lignes sources':tableData.displayRows.length.toLocaleString()+(tableData.isLimited?' / '+tableData.sourceCount.toLocaleString():'')+' lignes affichées'+(tableData.isLimited?' · affichage limité pour garder l’application fluide':'');let h='<div style="display:flex;justify-content:flex-end;font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:700">'+status+'</div><div class="table-wrap"><table><thead><tr>'+cols.map(c=>'<th>'+esc(colLabel(c))+'</th>').join('')+'</tr></thead><tbody>';h+=tableData.displayRows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(formatTableCell(c,r[c],tableData.isAggregated,tableData.measureCols))+'</td>').join('')+'</tr>').join('');h+='</tbody></table></div>';return h}
+function renderTableHTML(selectedCols,defaultColCount,tableMode,tableAggr){const cols=(selectedCols&&selectedCols.length)?selectedCols:columns.slice(0,(defaultColCount||5)).map(c=>c.name);const tableData=buildTableData(cols,tableMode,tableAggr);const colHead=c=>tableData.aggr&&tableData.measureCols.includes(c)?(TABLE_AGGR_LABELS[tableData.aggr]||tableData.aggr)+' · '+colLabel(c):colLabel(c);const status=tableData.isAggregated?tableData.displayRows.length.toLocaleString()+(tableData.isLimited?' / '+tableData.totalRows.toLocaleString():'')+' lignes consolidées · '+tableData.sourceCount.toLocaleString()+' lignes sources':tableData.displayRows.length.toLocaleString()+(tableData.isLimited?' / '+tableData.sourceCount.toLocaleString():'')+' lignes affichées'+(tableData.isLimited?' · affichage limité pour garder l’application fluide':'');let h='<div style="display:flex;justify-content:flex-end;font-size:10px;color:var(--muted);margin-bottom:6px;font-weight:700">'+status+'</div><div class="table-wrap"><table><thead><tr>'+cols.map(c=>'<th>'+esc(colHead(c))+'</th>').join('')+'</tr></thead><tbody>';h+=tableData.displayRows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(formatTableCell(c,r[c],tableData.isAggregated,tableData.measureCols))+'</td>').join('')+'</tr>').join('');h+='</tbody></table></div>';return h}
 const grid=document.getElementById('grid');
 widgets.forEach((w,wi)=>{
   const ct=CHART_TYPES.find(c=>c.id===w.type);
@@ -8109,7 +8188,7 @@ widgets.forEach((w,wi)=>{
   const color=w.color||accent;
   if(w.type==='kpi'){const val=w.kpiCol?computeKPI(w.kpiCol,w.aggrKpi||'sum'):0;const ag=AGGR_TYPES.find(a=>a.id===(w.aggrKpi||'sum'));el.innerHTML='<div class="kpi-val">'+fmt(val)+'</div><div class="kpi-sub">'+(ag?ag.label:'')+' — '+esc(colLabel(w.kpiCol||''))+'</div>';return}
   if(w.type==='gauge'){const val=w.gaugeCol?computeKPI(w.gaugeCol,w.aggrGauge||'avg'):0;const gmin=w.gaugeMin||0,gmax=w.gaugeMax||Math.max(val*1.5,100),gt=w.gaugeTarget||gmax*0.8;const pct=Math.max(0,Math.min(1,(val-gmin)/(gmax-gmin)));const tpct=Math.max(0,Math.min(1,(gt-gmin)/(gmax-gmin)));const angle=pct*180;const tx=75+58*Math.cos((tpct*180-180)*Math.PI/180);const ty=76+58*Math.sin((tpct*180-180)*Math.PI/180);const nx=75+44*Math.cos((angle-180)*Math.PI/180);const ny=76+44*Math.sin((angle-180)*Math.PI/180);const isOk=val<=gt;el.innerHTML='<div class="gauge-wrap"><svg width="160" height="90" viewBox="0 0 160 90"><path d="M14,78 A65,65 0 0,1 146,78" fill="none" stroke="#eef2f7" stroke-width="14" stroke-linecap="round"/><path d="M14,78 A65,65 0 0,1 146,78" fill="none" stroke="'+color+'" stroke-width="14" stroke-linecap="round" stroke-dasharray="'+(pct*204)+' 204"/><circle cx="'+tx+'" cy="'+ty+'" r="5" fill="'+(isOk?'#1D9E75':'#D85A30')+'" stroke="#fff" stroke-width="2"/><line x1="75" y1="76" x2="'+nx+'" y2="'+ny+'" stroke="#1a2733" stroke-width="2.5" stroke-linecap="round"/><circle cx="75" cy="76" r="5" fill="#1a2733"/><text x="75" y="66" text-anchor="middle" font-size="13" font-weight="800" fill="#1a2733" font-family="Barlow Condensed">'+fmt(val)+'</text></svg><div style="display:flex;gap:14px;font-size:10px;color:var(--mid)"><span>Min: <b>'+fmt(gmin)+'</b></span><span style="color:'+(isOk?'#1D9E75':'#D85A30')+'">Cible: <b>'+fmt(gt)+'</b></span><span>Max: <b>'+fmt(gmax)+'</b></span></div></div>';return}
-  if(w.type==='table'){const cols=(w.tableCols&&w.tableCols.length)?w.tableCols:columns.slice(0,5).map(c=>c.name);el.innerHTML=renderTableHTML(cols,5);return}
+  if(w.type==='table'){const cols=(w.tableCols&&w.tableCols.length)?w.tableCols:columns.slice(0,5).map(c=>c.name);el.innerHTML=renderTableHTML(cols,5,w.tableMode,w.tableAggr);return}
   if(w.type==='geo'){if(!w.col){return}const gd=groupByDim(w.col,w.col2,w.aggr||(w.col2?'sum':'count'),300);renderGeoWidget(w,el,wi,gd.map(d=>d[0]),gd.map(d=>d[1]),color);return}
   if(!w.col){return}
   let data=[];
@@ -8973,7 +9052,7 @@ widgets.forEach((w,wi)=>{
     const newFmtFn="let __fpCurrentWidget=null;function __fpNum(v){const n=parseFloat(String(v??'').replace(/\\s/g,'').replace(',','.'));return Number.isFinite(n)?n:0}function __fpCompact(n){const a=Math.abs(n);if(a>=1e9)return(n/1e9).toLocaleString('fr-FR',{maximumFractionDigits:1})+'Md';if(a>=1e6)return(n/1e6).toLocaleString('fr-FR',{maximumFractionDigits:1})+'M';if(a>=1e3)return(n/1e3).toLocaleString('fr-FR',{maximumFractionDigits:1})+'k';return Number.isInteger(n)?n.toLocaleString('fr-FR'):n.toLocaleString('fr-FR',{maximumFractionDigits:2})}function fmt(v,w){const n=__fpNum(v);w=w||__fpCurrentWidget||{};const f=w.valueFormat||'auto';const d=Number.isFinite(parseInt(w.valueDecimals,10))?Math.max(0,Math.min(6,parseInt(w.valueDecimals,10))):(f==='integer'?0:f==='percent'?1:2);const cur=w.valueCurrency||'EUR';const g=w.valueThousands!==false;const u=w.valueUnit||'';const add=s=>u?s+'\u202f'+u:s;if(f==='integer')return add(n.toLocaleString('fr-FR',{useGrouping:g,maximumFractionDigits:0}));if(f==='decimal')return add(n.toLocaleString('fr-FR',{useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d}));if(f==='currency')return add(new Intl.NumberFormat('fr-FR',{style:'currency',currency:cur,useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d}).format(n));if(f==='percent')return add(n.toLocaleString('fr-FR',{useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d})+' %');return add(__fpCompact(n))}";
     html=html.replace(fmtFn,newFmtFn);
     html=html.replace("widgets.forEach((w,wi)=>{","widgets.forEach((w,wi)=>{__fpCurrentWidget=w;");
-    html=html.replace(/function formatTableCell\(colName,value,isAggregated,measureCols\)\{[^}]+\}/,"function formatTableCell(colName,value,isAggregated,measureCols){var col=(typeof columns!==\'undefined\'?columns:[]).find(function(c){return c.name===colName;});if(col&&col.type===\'date\'){var df=(typeof colDisplayFormats!==\'undefined\'?colDisplayFormats:{})[colName]||\'date_short\';var pad=function(n){return String(n).padStart(2,\'0\')};var v=value;if(typeof v===\'string\'||typeof v===\'number\'){var d=new Date(v);if(!isNaN(d.getTime())){if(df===\'date_short\')return pad(d.getDate())+\'/\'+pad(d.getMonth()+1)+\'/\'+d.getFullYear();if(df===\'time\')return pad(d.getHours())+\':  \'+pad(d.getMinutes());if(df===\'datetime\')return pad(d.getDate())+\'/\'+pad(d.getMonth()+1)+\'/\'+d.getFullYear()+\' \'+pad(d.getHours())+\':  \'+pad(d.getMinutes());if(df===\'date_long\'){var M=[\'janvier\',\'février\',\'mars\',\'avril\',\'mai\',\'juin\',\'juillet\',\'août\',\'septembre\',\'octobre\',\'novembre\',\'décembre\'];return d.getDate()+\' \'+M[d.getMonth()]+\' \'+d.getFullYear();}return String(v)}}return String(v??\'\')}if((measureCols&&measureCols.includes(colName))||isMeasureColumn(colName))return fmt(value,__fpCurrentWidget);return String(value??\'\')}");
+    html=html.replace(/function formatTableCell\(colName,value,isAggregated,measureCols\)\{.*\}/,"function formatTableCell(colName,value,isAggregated,measureCols){var col=(typeof columns!==\'undefined\'?columns:[]).find(function(c){return c.name===colName;});if(col&&col.type===\'date\'){var df=(typeof colDisplayFormats!==\'undefined\'?colDisplayFormats:{})[colName]||\'date_short\';var pad=function(n){return String(n).padStart(2,\'0\')};var v=value;if(typeof v===\'string\'||typeof v===\'number\'){var d=new Date(v);if(!isNaN(d.getTime())){if(df===\'date_short\')return pad(d.getDate())+\'/\'+pad(d.getMonth()+1)+\'/\'+d.getFullYear();if(df===\'time\')return pad(d.getHours())+\':  \'+pad(d.getMinutes());if(df===\'datetime\')return pad(d.getDate())+\'/\'+pad(d.getMonth()+1)+\'/\'+d.getFullYear()+\' \'+pad(d.getHours())+\':  \'+pad(d.getMinutes());if(df===\'date_long\'){var M=[\'janvier\',\'février\',\'mars\',\'avril\',\'mai\',\'juin\',\'juillet\',\'août\',\'septembre\',\'octobre\',\'novembre\',\'décembre\'];return d.getDate()+\' \'+M[d.getMonth()]+\' \'+d.getFullYear();}return String(v)}}return String(v??\'\')}if((measureCols&&measureCols.includes(colName))||isMeasureColumn(colName))return fmt(value,__fpCurrentWidget);return String(value??\'\')}");
     html=html.replace(/callback:v=>fmt\(v\)/g,"callback:v=>fmt(v,w)");
     html=html.replace(/fmt\(val\)/g,"fmt(val,w)");
     html=html.replace(/fmt\(gmin\)/g,"fmt(gmin,w)").replace(/fmt\(gmax\)/g,"fmt(gmax,w)").replace(/fmt\(gt\)/g,"fmt(gt,w)");
