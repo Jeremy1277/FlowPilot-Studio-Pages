@@ -1247,7 +1247,7 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
           <!-- Clé OpenAI manquante : saisie directement ici -->
           <div id="calc-col-key" style="display:none;margin-top:12px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:12px">
             <div style="font-size:12px;font-weight:800;margin-bottom:4px">🔑 Connexion IA requise</div>
-            <div style="font-size:11px;color:var(--mid);margin-bottom:8px">Renseigne ta clé OpenAI (stockée uniquement dans ton navigateur, utilisée aussi par l'Agent Analyste).</div>
+            <div style="font-size:11px;color:var(--mid);margin-bottom:8px">Renseigne ta clé OpenAI (sk-…) ou Claude/Anthropic (sk-ant-…) — stockée uniquement dans ton navigateur, utilisée aussi par l'Agent Analyste.</div>
             <div style="display:flex;gap:8px;align-items:center">
               <input id="calc-col-key-input" type="password" placeholder="sk-..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none"/>
               <button class="btn btn-primary" type="button" onclick="calcColSaveKey()">Enregistrer</button>
@@ -3250,21 +3250,10 @@ Règles strictes :
 - Si la demande est floue, génère des widgets pertinents basés sur les colonnes disponibles`;
 
   try {
-    const resp=await fetch('https://api.openai.com/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+(getOpenAIKey()||'')},
-      body:JSON.stringify({
-        model:'gpt-4o-mini',
-        max_tokens:1200,
-        temperature:0.3,
-        messages:[
-          {role:'system', content:systemPrompt},
-          {role:'user', content:text}
-        ]
-      })
-    });
-    const data=await resp.json();
-    const raw=data.choices?.[0]?.message?.content||'{}';
+    const raw=(await fpAiChat([
+      {role:'system', content:systemPrompt},
+      {role:'user', content:text}
+    ],{maxTokens:1200, temperature:0.3}))||'{}';
     
     let parsed;
     try {
@@ -5141,6 +5130,60 @@ function getOpenAIKey(){
   return localStorage.getItem('flowpilot_openai_key')||'';
 }
 
+// ── Routeur IA multi-fournisseur ─────────────────────────────────────────
+// Une clé sk-ant-… route vers l'API Claude (Anthropic), une clé sk-… vers
+// OpenAI. Même clé stockée, même appel : fpAiChat(messages, opts) -> texte.
+function fpAiProviderInfo(){
+  const k=getOpenAIKey()||'';
+  return k.indexOf('sk-ant-')===0
+    ? {id:'anthropic', label:'Claude (Anthropic)', model:'claude-3-5-haiku-latest', host:'api.anthropic.com'}
+    : {id:'openai', label:'GPT-4o-mini (OpenAI)', model:'gpt-4o-mini', host:'api.openai.com'};
+}
+async function fpAiChat(messages, opts){
+  opts=opts||{};
+  const key=getOpenAIKey();
+  if(!key) throw new Error('Aucune clé API configurée.');
+  const p=fpAiProviderInfo();
+  let resp;
+  try{
+    if(p.id==='anthropic'){
+      const sys=messages.filter(m=>m.role==='system').map(m=>m.content).join('\n\n');
+      const rest=messages.filter(m=>m.role!=='system');
+      const body={model:p.model, max_tokens:opts.maxTokens||600,
+        messages:rest.length?rest:[{role:'user',content:sys||'Bonjour'}]};
+      if(sys&&rest.length) body.system=sys;
+      if(opts.temperature!=null) body.temperature=opts.temperature;
+      resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':key,
+          'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify(body)
+      });
+    } else {
+      const body={model:p.model, max_tokens:opts.maxTokens||600, messages:messages};
+      if(opts.temperature!=null) body.temperature=opts.temperature;
+      if(opts.json) body.response_format={type:'json_object'};
+      resp=await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+        body:JSON.stringify(body)
+      });
+    }
+  }catch(netErr){
+    throw new Error('Impossible de joindre '+p.host+' — réseau, pare-feu ou extension qui bloque ce domaine. '
+      +'Astuce : une clé '+(p.id==='openai'?'Claude/Anthropic (sk-ant-…)':'OpenAI (sk-…)')+' passera peut-être là où celle-ci est bloquée.');
+  }
+  const data=await resp.json().catch(()=>({}));
+  if(!resp.ok){
+    if(resp.status===401) throw new Error('Clé API invalide ou expirée ('+p.label+').');
+    throw new Error((data&&data.error&&data.error.message)||('HTTP '+resp.status));
+  }
+  if(p.id==='anthropic') return (data.content&&data.content[0]&&data.content[0].text)||'';
+  return (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||'';
+}
+window.fpAiChat=fpAiChat;
+window.fpAiProviderInfo=fpAiProviderInfo;
+
 function setOpenAIKey(k){
   if(k && k.startsWith('sk-')){
     localStorage.setItem('flowpilot_openai_key', k);
@@ -5158,12 +5201,12 @@ function showKeyPrompt(onSuccess){
       <div class="ai-chat-avatar ai">🔑</div>
       <div class="ai-chat-bubble">
         <div style="font-weight:800;margin-bottom:6px">Connexion IA requise</div>
-        <div style="font-size:12px;color:var(--mid);margin-bottom:10px">Renseignez votre clé OpenAI — elle sera sauvegardée dans votre navigateur.</div>
+        <div style="font-size:12px;color:var(--mid);margin-bottom:10px">Renseignez votre clé OpenAI (sk-…) ou Claude/Anthropic (sk-ant-…) — sauvegardée dans votre navigateur.</div>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="ki_${id}" type="password" placeholder="sk-..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none"/>
           <button style="background:var(--accent);color:var(--navy);border:none;border-radius:8px;padding:8px 14px;font-weight:800;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif" id="kb_${id}">Enregistrer</button>
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:7px">🔒 Stockée uniquement dans votre navigateur — jamais transmise ailleurs qu'à OpenAI.</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:7px">🔒 Stockée uniquement dans votre navigateur — transmise uniquement au fournisseur de la clé (OpenAI ou Anthropic).</div>
       </div>
     </div>`);
   feed.scrollTop = feed.scrollHeight;
@@ -5296,21 +5339,10 @@ async function agentSendToOpenAI(){
   try {
     const systemPrompt=rows.length>0 ? buildDataContext() : 'Tu es un assistant BI expert dans FlowPilot Studio. Réponds en français de façon concise.';
 
-    const resp=await fetch('https://api.openai.com/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+(getOpenAIKey()||'')},
-      body:JSON.stringify({
-        model:'gpt-4o-mini',
-        max_tokens:600,
-        messages:[
-          {role:'system', content:systemPrompt},
-          {role:'user', content:text}
-        ]
-      })
-    });
-
-    const data=await resp.json();
-    const reply=data.choices?.[0]?.message?.content||'Pas de réponse reçue.';
+    const reply=(await fpAiChat([
+      {role:'system', content:systemPrompt},
+      {role:'user', content:text}
+    ],{maxTokens:600}))||'Pas de réponse reçue.';
 
     // Remplacer le typing indicator
     const el=document.getElementById(tid);
@@ -5320,12 +5352,12 @@ async function agentSendToOpenAI(){
         .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
         .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
         .replace(/\n/g,'<br>');
-      el.querySelector('.agent-bubble').innerHTML=`<span style="font-size:10px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px">✨ GPT-4o-mini</span>${html}`;
+      el.querySelector('.agent-bubble').innerHTML=`<span style="font-size:10px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px">✨ ${fpAiProviderInfo().label}</span>${html}`;
     }
 
     // Mettre à jour le statut
     const statusLine=document.getElementById('agent-status-line');
-    if(statusLine) statusLine.innerHTML=`<span class="as-dot-ai"></span>IA connectée · GPT-4o-mini`;
+    if(statusLine) statusLine.innerHTML=`<span class="as-dot-ai"></span>IA connectée · ${fpAiProviderInfo().label}`;
 
   } catch(err){
     const el=document.getElementById(tid);
@@ -10451,21 +10483,10 @@ Si c'est une question ou une explication (pas une modification), réponds en tex
 Ne mélange jamais JSON et texte dans la même réponse.`;
 
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+getOpenAIKey()},
-      body:JSON.stringify({
-        model:'gpt-4o-mini',
-        max_tokens:400,
-        messages:[
-          {role:'system', content:systemPrompt},
-          ..._waiHistory[wid]
-        ]
-      })
-    });
-
-    const data = await resp.json();
-    const reply = data.choices?.[0]?.message?.content||'Pas de réponse.';
+    const reply = (await fpAiChat([
+      {role:'system', content:systemPrompt},
+      ..._waiHistory[wid]
+    ],{maxTokens:400}))||'Pas de réponse.';
     _waiHistory[wid].push({role:'assistant', content:reply});
 
     const el = document.getElementById(tid);
@@ -10695,22 +10716,7 @@ Pour les tranches : r["SALAIRE"] < 2000 ? '<2000' : r["SALAIRE"] < 3500 ? '2000-
 La formule doit être robuste aux valeurs nulles/undefined.`;
 
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+getOpenAIKey()},
-      body:JSON.stringify({
-        model:'gpt-4o-mini', max_tokens:400,
-        response_format:{type:'json_object'},
-        messages:[{role:'user', content:prompt}]
-      })
-    });
-    const data = await resp.json().catch(()=>({}));
-    if(!resp.ok){
-      const apiMsg = data?.error?.message || ('HTTP '+resp.status);
-      if(resp.status===401) throw new Error('Clé OpenAI invalide ou expirée — vérifie ta clé (bouton Enregistrer ci-dessous).');
-      throw new Error(apiMsg);
-    }
-    const raw = data.choices?.[0]?.message?.content||'{}';
+    const raw = (await fpAiChat([{role:'user', content:prompt}],{maxTokens:400, json:true}))||'{}';
     const clean = raw.replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(clean);
 
@@ -10733,16 +10739,13 @@ La formule doit être robuste aux valeurs nulles/undefined.`;
     document.getElementById('calc-col-err').style.display = 'none';
 
   } catch(err) {
-    let msg='❌ '+err.message;
-    if(String(err.message)==='Failed to fetch'){
-      msg='❌ Impossible de joindre api.openai.com — réseau d\'entreprise, pare-feu ou extension qui bloque OpenAI ? '
-        +'En attendant, tu peux écrire la formule toi-même ci-dessous (sans IA).';
+    document.getElementById('calc-col-err').textContent = '❌ ' + err.message;
+    document.getElementById('calc-col-err').style.display = '';
+    if(String(err.message).indexOf('Impossible de joindre')===0){
       const mb=document.getElementById('calc-col-manual');
       if(mb) mb.style.display='';
     }
-    document.getElementById('calc-col-err').textContent = msg;
-    document.getElementById('calc-col-err').style.display = '';
-    if(String(err.message).indexOf('Clé OpenAI')===0){
+    if(String(err.message).indexOf('Clé API')===0){
       const kb=document.getElementById('calc-col-key');
       if(kb) kb.style.display='';
     }

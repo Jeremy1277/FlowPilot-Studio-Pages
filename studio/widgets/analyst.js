@@ -482,34 +482,17 @@ async function sendMessage() {
   }
 
   try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 600,
-        messages: [
-          {
-            role: 'system',
-            content: 'Tu es un analyste BI expert. Tu analyses les données d\'un dashboard FlowPilot Studio et tu fournis des insights clairs, concis et actionnables. Réponds en français. Sois direct et précis. Utilise des bullet points quand c\'est pertinent. Voici le contexte du dashboard :\n\n' + ctx
-          },
-          ..._history
-        ]
-      })
-    });
-
-    const data = await resp.json();
+    const reply = await window.fpAiChat([
+      {
+        role: 'system',
+        content: 'Tu es un analyste BI expert. Tu analyses les données d\'un dashboard FlowPilot Studio et tu fournis des insights clairs, concis et actionnables. Réponds en français. Sois direct et précis. Utilise des bullet points quand c\'est pertinent. Voici le contexte du dashboard :\n\n' + ctx
+      },
+      ..._history
+    ], { maxTokens: 600 });
     thinking?.remove();
 
-    if (data.error) {
-      addMessage('assistant', '❌ Erreur API : ' + data.error.message);
-      _history.pop();
-      return;
-    }
-
-    const reply = data.choices?.[0]?.message?.content || 'Pas de réponse.';
-    addMessage('assistant', reply);
-    _history.push({ role: 'assistant', content: reply });
+    addMessage('assistant', reply || 'Pas de réponse.');
+    _history.push({ role: 'assistant', content: reply || '' });
     updateContext();
 
   } catch(e) {
