@@ -2464,9 +2464,39 @@ function handleDrop(e){
   const f=e.dataTransfer.files[0]; if(f) handleFile(f);
 }
 // ── Overlay de chargement (bloque les clics pendant l'analyse) ──────────
+// Progression en pourcentage : les étapes réelles fixent des paliers
+// (fpLoadSetPct) et, entre deux paliers, la valeur avance en continu vers un
+// plafond (fpLoadCreep) — jamais de retour en arrière, jamais de barre infinie.
+let _fpLoadPct=0,_fpLoadCeil=0,_fpLoadTimer=null;
+function fpLoadPaint(){
+  const t=document.getElementById('fp-load-pct'), b=document.getElementById('fp-load-bar');
+  const v=Math.round(_fpLoadPct);
+  if(t) t.textContent=v+' %';
+  if(b) b.style.width=Math.max(2,v)+'%';
+}
+function fpLoadSetPct(v){
+  _fpLoadPct=Math.min(100,Math.max(_fpLoadPct,v));
+  if(_fpLoadCeil<_fpLoadPct) _fpLoadCeil=_fpLoadPct;
+  fpLoadPaint();
+}
+function fpLoadCreep(ceil){
+  _fpLoadCeil=Math.max(_fpLoadCeil,ceil);
+  if(_fpLoadTimer) return;
+  _fpLoadTimer=setInterval(()=>{
+    if(_fpLoadPct<_fpLoadCeil){
+      _fpLoadPct=Math.min(_fpLoadCeil,_fpLoadPct+Math.max(0.35,(_fpLoadCeil-_fpLoadPct)*0.055));
+      fpLoadPaint();
+    }
+  },120);
+}
 function fpLoadUI(show, phase, sub){
   let ov=document.getElementById('fp-load-overlay');
-  if(!show){ if(ov) ov.remove(); return; }
+  if(!show){
+    if(_fpLoadTimer){ clearInterval(_fpLoadTimer); _fpLoadTimer=null; }
+    _fpLoadPct=0; _fpLoadCeil=0;
+    if(ov) ov.remove();
+    return;
+  }
   if(!ov){
     ov=document.createElement('div');
     ov.id='fp-load-overlay';
@@ -2475,12 +2505,15 @@ function fpLoadUI(show, phase, sub){
       +'<div style="width:64px;height:64px;border-radius:20px;margin:0 auto 14px;display:grid;place-items:center;color:var(--accent);background:var(--accent-soft);border:1px solid rgba(239,159,39,.25);box-shadow:0 10px 24px rgba(13,27,42,.12)"><svg class="ui-svg" style="width:34px;height:34px"><use href="#i-hero-bars"></use></svg></div>'
       +'<div id="fp-load-phase" style="font-weight:800;font-size:15px;color:var(--dark)"></div>'
       +'<div id="fp-load-sub" style="font-size:12px;color:var(--muted);margin-top:5px;min-height:16px"></div>'
-      +'<div style="margin-top:16px;height:8px;border-radius:99px;background:var(--bg);overflow:hidden;position:relative">'
-      +'<div id="fp-load-bar" style="position:absolute;top:0;bottom:0;left:0;width:40%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));animation:fpload 1.1s ease-in-out infinite"></div>'
+      +'<div id="fp-load-pct" style="margin-top:14px;font-family:\'Barlow Condensed\',\'DM Sans\',sans-serif;font-weight:800;font-size:32px;line-height:1;letter-spacing:.02em;color:var(--accent)">0 %</div>'
+      +'<div style="margin-top:10px;height:6px;border-radius:99px;background:var(--bg);overflow:hidden">'
+      +'<div id="fp-load-bar" style="height:100%;width:2%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .25s ease"></div>'
       +'</div></div>';
     // avale tous les clics : un clic « à côté » pendant le chargement ne casse plus rien
     ['click','mousedown','pointerdown'].forEach(ev=>ov.addEventListener(ev,e=>{e.stopPropagation();e.preventDefault();},true));
     document.body.appendChild(ov);
+    fpLoadPaint();
+    fpLoadCreep(85); // progression par défaut : tout chemin de chargement avance
   }
   const p=document.getElementById('fp-load-phase'), sb=document.getElementById('fp-load-sub');
   if(p) p.textContent=phase||'';
@@ -2533,15 +2566,18 @@ function handleFile(file){
   window.__fpLastFileMeta={name:file.name, size:file.size, handle:window.__fpPendingHandle||null};
   window.__fpPendingHandle=null;
   fpLoadUI(true,'Lecture de « '+file.name+' »…','Ouverture du fichier');
+  fpLoadCreep(18);
   const reader=new FileReader();
+  reader.onprogress=e=>{ if(e.lengthComputable&&e.total>0) fpLoadSetPct(e.loaded/e.total*20); };
   reader.onerror=()=>{ fpLoadUI(false); toast('⚠ Lecture du fichier impossible'); };
-  reader.onload=e=>{ fpProcessWorkbook(e.target.result, file); };
+  reader.onload=e=>{ fpLoadSetPct(22); fpProcessWorkbook(e.target.result, file); };
   reader.readAsArrayBuffer(file);
 }
 
 async function fpProcessWorkbook(buf, file){
   try{
     fpLoadUI(true,'Analyse du classeur…','Décompression et lecture des feuilles');
+    fpLoadCreep(62);
     await fpLoadYield();
     let source, sheets;
     try{
@@ -2572,6 +2608,7 @@ async function fpProcessWorkbook(buf, file){
       });
       source={kind:'wb', wb};
     }
+    fpLoadSetPct(65);
     const usable=sheets.filter(sh=>sh.rows>0);
     if(usable.length===0){ fpLoadUI(false); toast(window.FP_t?window.FP_t('toast_empty_file'):'⚠ Fichier vide'); return; }
     if(usable.length===1){
@@ -2590,6 +2627,7 @@ async function loadSheetFromSource(source, sheetInfo, fileName, showSheetInName)
   try{
     fpLoadUI(true,'Préparation de « '+sheetInfo.name+' »…',
       (sheetInfo.rows?sheetInfo.rows.toLocaleString('fr-FR')+' lignes · ':'')+'conversion des données');
+    fpLoadCreep(88);
     await fpLoadYield();
     let parsed;
     if(source.kind==='worker'){
@@ -2599,9 +2637,13 @@ async function loadSheetFromSource(source, sheetInfo, fileName, showSheetInName)
       parsed=XLSX.utils.sheet_to_json(source.wb.Sheets[sheetInfo.name],{defval:''});
     }
     if(!parsed.length){ fpLoadUI(false); toast(window.FP_t?window.FP_t('toast_empty_file'):'⚠ Feuille vide'); return; }
+    fpLoadSetPct(90);
     fpLoadUI(true,'Finalisation…','Détection des types de colonnes');
+    fpLoadCreep(98);
     await fpLoadYield();
     loadData(parsed, showSheetInName?fileName+' — '+sheetInfo.name:fileName);
+    fpLoadSetPct(100);
+    await new Promise(r=>setTimeout(r,180)); // laisse voir le 100 %
     fpLoadUI(false);
     try{ fpHistoryAdd({name:fileName, sheet:showSheetInName?sheetInfo.name:null,
       rows:parsed.length, size:(window.__fpLastFileMeta&&window.__fpLastFileMeta.size)||null,
