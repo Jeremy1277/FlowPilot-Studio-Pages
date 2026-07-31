@@ -5144,6 +5144,24 @@ const FP_AI_PROVIDERS={
   deepseek: {label:'DeepSeek Chat',        short:'DeepSeek',host:'api.deepseek.com',url:'https://api.deepseek.com/v1/chat/completions', model:'deepseek-chat',           hint:'sk-…',     doc:'platform.deepseek.com'},
 };
 window.FP_AI_PROVIDERS=FP_AI_PROVIDERS;
+function fpAiCustom(){ try{ return JSON.parse(localStorage.getItem('fp_ai_custom')||'{}'); }catch(e){ return {}; } }
+function fpAiProviders(){ return Object.assign({}, FP_AI_PROVIDERS, fpAiCustom()); }
+window.fpAiProviders=fpAiProviders;
+function fpAiAddCustom(label, baseUrl, model){
+  const id='c_'+label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,24);
+  let host=''; try{ host=new URL(baseUrl).host; }catch(e){ host=baseUrl; }
+  const url=baseUrl.replace(/\/+$/,'')+'/chat/completions';
+  const m=fpAiCustom();
+  m[id]={label:label, short:label, host:host, url:url, model:model, hint:'clé API', custom:true};
+  try{ localStorage.setItem('fp_ai_custom',JSON.stringify(m)); }catch(e){}
+  return id;
+}
+function fpAiRemoveKey(pid){
+  fpAiSetKey(pid,'');
+  const m=fpAiCustom();
+  if(m[pid]){ delete m[pid]; try{ localStorage.setItem('fp_ai_custom',JSON.stringify(m)); }catch(e){} }
+  if(localStorage.getItem('fp_ai_provider')===pid) localStorage.removeItem('fp_ai_provider');
+}
 function fpAiKeys(){ try{ return JSON.parse(localStorage.getItem('fp_ai_keys')||'{}'); }catch(e){ return {}; } }
 function fpAiSetKey(pid,key){
   const m=fpAiKeys();
@@ -5154,9 +5172,10 @@ function fpAiSetKey(pid,key){
 function fpAiSetActive(pid){ try{ localStorage.setItem('fp_ai_provider',pid); }catch(e){} }
 function fpAiActive(){
   const m=fpAiKeys();
+  const P=fpAiProviders();
   const pref=localStorage.getItem('fp_ai_provider');
-  if(pref&&m[pref]) return pref;
-  const first=Object.keys(FP_AI_PROVIDERS).find(p=>m[p]);
+  if(pref&&m[pref]&&P[pref]) return pref;
+  const first=Object.keys(P).find(p=>m[p]);
   return first||null;
 }
 // Migration de l'ancienne clé unique (flowpilot_openai_key)
@@ -5169,13 +5188,14 @@ function fpAiActive(){
 })();
 function fpAiProviderInfo(){
   const pid=fpAiActive()||'openai';
-  return Object.assign({id:pid},FP_AI_PROVIDERS[pid]);
+  return Object.assign({id:pid},fpAiProviders()[pid]||FP_AI_PROVIDERS.openai);
 }
 window.fpAiProviderInfo=fpAiProviderInfo;
 
 async function fpAiRequest(pid,key,messages,opts){
   opts=opts||{};
-  const P=FP_AI_PROVIDERS[pid];
+  const P=fpAiProviders()[pid];
+  if(!P) throw new Error('Fournisseur inconnu.');
   let resp;
   try{
     if(pid==='anthropic'){
@@ -5220,7 +5240,7 @@ window.fpAiChat=fpAiChat;
 async function fpAiTestKey(pid,key){
   try{
     await fpAiRequest(pid,key,[{role:'user',content:'ping'}],{maxTokens:1});
-    return {ok:true, message:'Clé valide — '+FP_AI_PROVIDERS[pid].model};
+    return {ok:true, message:'Clé valide — '+(fpAiProviders()[pid]||{}).model};
   }catch(e){
     return {ok:false, message:e.message};
   }
@@ -10227,18 +10247,31 @@ function collectState() {
     accentColor: document.getElementById('dp-color')?.value || '',
     widgets:     (typeof widgets !== 'undefined') ? JSON.parse(JSON.stringify(widgets)) : [],
     columns:     (typeof columns !== 'undefined') ? JSON.parse(JSON.stringify(columns)) : [],
+    colAliases:  (typeof colAliases !== 'undefined') ? colAliases : {},
+    colDateFormats: (typeof colDateFormats !== 'undefined') ? colDateFormats : {},
     fileName:    (typeof currentFileName !== 'undefined') ? currentFileName : '',
+    // Les données elles-mêmes : le projet se rouvre complet, sans recharger l'Excel
+    rows:        (typeof rows !== 'undefined') ? rows : [],
+    sourceName:  (typeof sourceName !== 'undefined') ? sourceName : '',
   };
 }
 
+window.fpCollectState = collectState; // exposé (tests, extensions)
 let _fpFileHandle = null; // handle showSaveFilePicker pour ré-écriture directe
 
 window.fpSaveProject = async function() {
   try {
     const state = collectState();
     const name  = (state.appName || 'flowpilot-project').replace(/[^a-z0-9-_]/gi, '_');
-    const json  = JSON.stringify(state, null, 2);
-    const blob  = new Blob([json], { type: 'application/json' });
+    const json  = JSON.stringify(state);
+    let blob;
+    if (window.CompressionStream) {
+      // gzip : un projet avec 35 000 lignes passe de ~30 Mo à ~3 Mo
+      const cs = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+      blob = await new Response(cs).blob();
+    } else {
+      blob = new Blob([json], { type: 'application/json' });
+    }
 
     if (window.showSaveFilePicker) {
       // Edge / Chrome — fenetre "Enregistrer sous" la premiere fois, direct ensuite
@@ -10285,19 +10318,45 @@ function restoreState(state) {
     if (Array.isArray(state.columns) && typeof columns !== 'undefined') {
       columns.length = 0; state.columns.forEach(c => columns.push(c));
     }
+    if (state.colAliases && typeof colAliases !== 'undefined') Object.assign(colAliases, state.colAliases);
+    if (state.colDateFormats && typeof colDateFormats !== 'undefined') Object.assign(colDateFormats, state.colDateFormats);
+    // Données incluses dans le projet -> restauration complète
+    if (Array.isArray(state.rows) && state.rows.length && typeof rows !== 'undefined') {
+      rows = state.rows;
+      if (typeof clearAggregationCache === 'function') clearAggregationCache();
+      if (typeof buildFieldModel === 'function') { try { buildFieldModel(); } catch(e2) {} }
+      sourceName = state.sourceName || (state.fileName ? state.fileName + ' · ' + rows.length.toLocaleString() + ' lignes' : 'Projet restauré');
+      const pill = document.getElementById('source-pill');
+      if (pill) { pill.textContent = sourceName; pill.style.display = ''; }
+    }
     if (state.appName) { const el = document.getElementById('app-name'); if (el) el.value = state.appName; }
     if (typeof goStep === 'function') goStep(3);
     setTimeout(() => { if (typeof renderWidgets === 'function') renderWidgets(); }, 100);
     setTimeout(() => { if (typeof renderColumnList === 'function') renderColumnList(); }, 120);
-    if (typeof toast === 'function') toast('Projet restaure - ' + (state.appName || 'sans nom'));
+    if (typeof toast === 'function') toast('Projet restauré — ' + (state.appName || 'sans nom')
+      + (Array.isArray(state.rows) && state.rows.length ? ' · ' + state.rows.length.toLocaleString() + ' lignes' : ''));
+    if (!(Array.isArray(state.rows) && state.rows.length)) {
+      setTimeout(() => { if (typeof toast === 'function') toast('ℹ️ Projet sans données (ancien format) — recharge le fichier source depuis Réglages → Historique'); }, 1200);
+    }
   } catch(e) { alert('Erreur restauration : ' + e.message); }
 }
 
-function loadFromFile(file) {
+window.fpLoadFromFile = loadFromFile;
+async function loadFromFile(file) {
   if (!file || !file.name.endsWith('.fpstudio')) { alert('Choisir un fichier .fpstudio'); return; }
-  const reader = new FileReader();
-  reader.onload = e => { try { restoreState(JSON.parse(e.target.result)); } catch(err) { alert('Fichier corrompu : ' + err.message); } };
-  reader.readAsText(file);
+  try {
+    const buf = await file.arrayBuffer();
+    const head = new Uint8Array(buf.slice(0, 2));
+    let text;
+    if (head[0] === 0x1f && head[1] === 0x8b && window.DecompressionStream) {
+      // nouveau format compressé (gzip)
+      const ds = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+      text = await new Response(ds).text();
+    } else {
+      text = new TextDecoder().decode(buf);
+    }
+    restoreState(JSON.parse(text));
+  } catch(err) { alert('Fichier corrompu : ' + err.message); }
 }
 
 function injectLoadBtn() {
@@ -10966,10 +11025,23 @@ function fpSettingsBtnRefresh(){
   const b=document.getElementById('fp-settings-btn');
   if(!b) return;
   const ini=fpInitials(fpProfile().name);
-  b.innerHTML=ini
+  const st=fpAiLastStatus();
+  const dot=st?'<span title="IA : '+esc(st.message)+'" style="position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:99px;border:2px solid var(--card);background:'+(st.ok?'var(--green)':'var(--coral)')+'"></span>':'';
+  b.style.position='relative';
+  b.innerHTML=(ini
     ? '<span style="width:26px;height:26px;border-radius:99px;background:var(--accent);color:#0d1b2a;display:inline-grid;place-items:center;font-size:11px;font-weight:900">'+esc(ini)+'</span>'
-    : '<span style="font-size:15px">⚙️</span>';
+    : '<span style="font-size:15px">⚙️</span>')+dot;
 }
+function fpAiLastStatus(){ try{ return JSON.parse(localStorage.getItem('fp_ai_last_status')||'null'); }catch(e){ return null; } }
+async function fpAiBootCheck(){
+  const pid=fpAiActive();
+  if(!pid) return;
+  const res=await fpAiTestKey(pid,fpAiKeys()[pid]);
+  try{ localStorage.setItem('fp_ai_last_status',JSON.stringify({pid:pid, ok:res.ok, message:res.message, at:Date.now()})); }catch(e){}
+  fpSettingsBtnRefresh();
+}
+setTimeout(fpAiBootCheck, 2500);
+
 (function injectSettingsBtn(){
   const target=document.querySelector('.tb-actions');
   if(!target||document.getElementById('fp-settings-btn')) return;
@@ -11021,23 +11093,45 @@ function fpOpenSettings(instant){
   }).join('')+'<button type="button" onclick="localStorage.removeItem(\'fp_file_history\');fpSettingsRefresh();" style="background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;text-decoration:underline;padding:2px 0;font-family:inherit">Vider l\'historique</button>'
   :'<div style="font-size:11px;color:var(--muted)">Aucun fichier chargé pour l\'instant.</div>';
 
-  const aiHtml=Object.keys(FP_AI_PROVIDERS).map(pid=>{
-    const P=FP_AI_PROVIDERS[pid];
-    const hasKey=!!keys[pid];
-    return '<div style="border:1px solid '+(active===pid?'var(--accent)':'var(--border)')+';border-radius:12px;padding:10px 12px;margin-bottom:8px;background:'+(active===pid?'var(--accent-soft)':'var(--card2)')+'">'
-      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:7px">'
-      +'<input type="radio" name="fp-ai-active" value="'+pid+'" '+(active===pid?'checked':'')+' style="accent-color:var(--accent)" onchange="fpAiSetActive(\''+pid+'\');fpSettingsRefreshAi()"/>'
-      +'<span style="font-size:12px;font-weight:800;color:var(--dark)">'+P.label+'</span>'
-      +'<span style="margin-left:auto;font-size:9px;color:var(--muted)">'+P.host+'</span>'
-      +'</label>'
-      +'<div style="display:flex;gap:6px">'
-      +'<input type="password" id="fp-ai-key-'+pid+'" placeholder="'+P.hint+'" value="'+(hasKey?esc(keys[pid]):'')+'" '
-      +'style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:11px;font-family:\'DM Mono\',monospace;outline:none;min-width:0"/>'
-      +'<button type="button" class="btn" style="padding:6px 10px;font-size:11px" onclick="fpSettingsTestKey(\''+pid+'\')">Tester</button>'
-      +'</div>'
-      +'<div id="fp-ai-status-'+pid+'" style="font-size:10px;margin-top:5px;min-height:13px;color:var(--muted)"></div>'
+  const ALLP=fpAiProviders();
+  const savedPids=Object.keys(ALLP).filter(pid=>keys[pid]);
+  const lastSt=fpAiLastStatus();
+  const aiHtml=(savedPids.length?savedPids.map(pid=>{
+    const P=ALLP[pid];
+    const k=keys[pid]||'';
+    const masked='••••'+k.slice(-4);
+    const isActive=active===pid;
+    const stTxt=(lastSt&&lastSt.pid===pid)?((lastSt.ok?'✅ ':'❌ ')+lastSt.message):'';
+    return '<div style="border:1px solid '+(isActive?'var(--accent)':'var(--border)')+';border-radius:12px;padding:10px 12px;margin-bottom:8px;background:'+(isActive?'var(--accent-soft)':'var(--card2)')+'">'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer">'
+      +'<input type="radio" name="fp-ai-active" value="'+pid+'" '+(isActive?'checked':'')+' style="accent-color:var(--accent)" onchange="fpAiSetActive(\''+pid+'\');fpSettingsVerify(\''+pid+'\')"/>'
+      +'<span style="font-size:12px;font-weight:800;color:var(--dark)">'+esc(P.label)+'</span>'
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">'+masked+'</span>'
+      +'<span style="margin-left:auto;display:flex;gap:5px">'
+      +'<button type="button" class="btn" style="padding:4px 8px;font-size:10px" onclick="fpSettingsVerify(\''+pid+'\')">Vérifier</button>'
+      +'<button type="button" class="btn" style="padding:4px 7px;font-size:10px" title="Supprimer cette clé" onclick="fpAiRemoveKey(\''+pid+'\');fpSettingsRefresh()">🗑</button>'
+      +'</span></label>'
+      +'<div id="fp-ai-status-'+pid+'" style="font-size:10px;margin-top:5px;min-height:12px;color:var(--muted)">'+stTxt+'</div>'
       +'</div>';
-  }).join('');
+  }).join(''):'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Aucune clé enregistrée pour l\'instant.</div>')
+  // formulaire d'ajout
+  +'<button type="button" class="btn" style="width:100%;justify-content:center" onclick="document.getElementById(\'fp-ai-add\').style.display=document.getElementById(\'fp-ai-add\').style.display===\'none\'?\'\':\'none\'">➕ Ajouter une clé</button>'
+  +'<div id="fp-ai-add" style="display:'+(savedPids.length?'none':'')+';margin-top:8px;border:1px dashed var(--border);border-radius:12px;padding:12px;background:var(--card2)">'
+  +'<select id="fp-ai-new-provider" onchange="document.getElementById(\'fp-ai-custom-fields\').style.display=this.value===\'__custom\'?\'\':\'none\'" style="width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--dark);font-family:inherit;margin-bottom:7px">'
+  +Object.keys(FP_AI_PROVIDERS).map(pid=>'<option value="'+pid+'">'+esc(FP_AI_PROVIDERS[pid].label)+'</option>').join('')
+  +'<option value="__custom">Autre fournisseur (API compatible OpenAI)…</option>'
+  +'</select>'
+  +'<div id="fp-ai-custom-fields" style="display:none;margin-bottom:7px">'
+  +'<input type="text" id="fp-ai-custom-name" placeholder="Nom (ex : Groq, Grok, OpenRouter…)" style="width:100%;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-family:inherit;margin-bottom:5px"/>'
+  +'<input type="text" id="fp-ai-custom-url" placeholder="URL de base (ex : https://api.groq.com/openai/v1)" style="width:100%;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-family:\'DM Mono\',monospace;margin-bottom:5px"/>'
+  +'<input type="text" id="fp-ai-custom-model" placeholder="Modèle (ex : llama-3.3-70b-versatile)" style="width:100%;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-family:\'DM Mono\',monospace"/>'
+  +'</div>'
+  +'<div style="display:flex;gap:6px">'
+  +'<input type="password" id="fp-ai-new-key" placeholder="Clé API" style="flex:1;min-width:0;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-family:\'DM Mono\',monospace"/>'
+  +'<button type="button" class="btn btn-primary" style="padding:6px 10px;font-size:11px;white-space:nowrap" onclick="fpSettingsAddKey()">Vérifier & enregistrer</button>'
+  +'</div>'
+  +'<div id="fp-ai-add-status" style="font-size:10px;margin-top:6px;min-height:12px;color:var(--muted)"></div>'
+  +'</div>';
 
   ov.innerHTML='<div id="fp-settings-panel" style="position:absolute;top:0;right:0;bottom:0;width:min(420px,94vw);background:var(--card);border-left:1px solid var(--border);box-shadow:-24px 0 60px rgba(0,0,0,.35);display:flex;flex-direction:column;transform:translateX(105%);transition:transform .22s ease">'
     +'<div style="background:var(--navy);padding:16px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
@@ -11085,35 +11179,51 @@ function fpOpenSettings(instant){
       if(av) av.textContent=fpInitials(document.getElementById('fp-prof-name').value)||'👤';
     });
   });
-  // clés IA : sauvegarde à la saisie, test auto à la sortie du champ
-  Object.keys(FP_AI_PROVIDERS).forEach(pid=>{
-    const el=document.getElementById('fp-ai-key-'+pid);
-    if(!el) return;
-    el.addEventListener('change',()=>{ fpAiSetKey(pid,el.value.trim()); if(el.value.trim()) fpSettingsTestKey(pid); fpSettingsRefreshAi(); });
-  });
+  // vérification automatique de la clé active à l'ouverture du tiroir
+  if(active&&keys[active]) fpSettingsVerify(active);
 }
-function fpSettingsRefreshAi(){
-  const active=fpAiActive();
-  Object.keys(FP_AI_PROVIDERS).forEach(pid=>{
-    const input=document.getElementById('fp-ai-key-'+pid);
-    if(!input) return;
-    const card=input.closest('div').parentNode;
-    card.style.borderColor=active===pid?'var(--accent)':'var(--border)';
-    card.style.background=active===pid?'var(--accent-soft)':'var(--card2)';
-  });
-}
-async function fpSettingsTestKey(pid){
-  const input=document.getElementById('fp-ai-key-'+pid);
+// Vérifie la clé enregistrée d'un fournisseur (carte du tiroir)
+async function fpSettingsVerify(pid){
   const st=document.getElementById('fp-ai-status-'+pid);
-  if(!input||!st) return;
-  const key=input.value.trim();
-  if(!key){ st.textContent='Renseigne une clé d\'abord.'; st.style.color='var(--coral)'; return; }
-  fpAiSetKey(pid,key);
-  st.textContent='⏳ Vérification auprès de '+FP_AI_PROVIDERS[pid].host+'…';
+  const key=fpAiKeys()[pid];
+  if(!st||!key) return;
+  const P=fpAiProviders()[pid]||{};
+  st.textContent='⏳ Vérification auprès de '+(P.host||'')+'…';
   st.style.color='var(--muted)';
   const res=await fpAiTestKey(pid,key);
   st.textContent=(res.ok?'✅ ':'❌ ')+res.message;
   st.style.color=res.ok?'var(--green)':'var(--coral)';
+  try{ localStorage.setItem('fp_ai_last_status',JSON.stringify({pid:pid, ok:res.ok, message:res.message, at:Date.now()})); }catch(e){}
+  fpSettingsBtnRefresh();
+}
+// Ajout d'une nouvelle clé : vérifiée auprès du fournisseur avant enregistrement
+async function fpSettingsAddKey(){
+  const sel=document.getElementById('fp-ai-new-provider');
+  const st=document.getElementById('fp-ai-add-status');
+  const key=(document.getElementById('fp-ai-new-key')||{value:''}).value.trim();
+  if(!key){ st.textContent='Renseigne la clé.'; st.style.color='var(--coral)'; return; }
+  let pid=sel.value;
+  if(pid==='__custom'){
+    const name=(document.getElementById('fp-ai-custom-name')||{value:''}).value.trim();
+    const url=(document.getElementById('fp-ai-custom-url')||{value:''}).value.trim();
+    const model=(document.getElementById('fp-ai-custom-model')||{value:''}).value.trim();
+    if(!name||!url||!model){ st.textContent='Nom, URL de base et modèle sont requis pour un fournisseur personnalisé.'; st.style.color='var(--coral)'; return; }
+    pid=fpAiAddCustom(name,url,model);
+  }
+  const P=fpAiProviders()[pid];
+  st.textContent='⏳ Vérification auprès de '+P.host+'…';
+  st.style.color='var(--muted)';
+  const res=await fpAiTestKey(pid,key);
+  if(res.ok){
+    fpAiSetKey(pid,key);
+    fpAiSetActive(pid);
+    try{ localStorage.setItem('fp_ai_last_status',JSON.stringify({pid:pid, ok:true, message:res.message, at:Date.now()})); }catch(e){}
+    fpSettingsRefresh();
+    toast('✅ Clé '+P.label+' vérifiée et enregistrée');
+  } else {
+    st.innerHTML='❌ '+esc(res.message)+' <button type="button" onclick="fpAiSetKey(\''+pid+'\',document.getElementById(\'fp-ai-new-key\').value.trim());fpAiSetActive(\''+pid+'\');fpSettingsRefresh()" style="background:none;border:none;color:var(--mid);text-decoration:underline;cursor:pointer;font-size:10px;font-family:inherit">Enregistrer quand même</button>';
+    st.style.color='var(--coral)';
+  }
 }
 
 </script>
