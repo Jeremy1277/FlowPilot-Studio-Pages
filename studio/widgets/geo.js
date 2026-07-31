@@ -627,7 +627,8 @@ function easeOutCubic(t){ return 1-Math.pow(1-t,3); }
 
 function looksLikeCp(s){
   s=String(s).trim().toUpperCase();
-  if(/^[0-9]{4,5}$/.test(s)) return true;                                  // FR/DE/ES/IT/BE/CH/AT…
+  if(/^[0-9]{4,6}$/.test(s)) return true;                                  // FR/DE/ES/IT/BE/CH/AT… + RO/RU/BY (6)
+  if(/^[A-Z]-[0-9]{4}$/.test(s)) return true;                              // LU (L-2611)
   if(/^[0-9]{2}-[0-9]{3}$/.test(s)) return true;                           // PL
   if(/^[0-9]{4}-[0-9]{3}$/.test(s)) return true;                           // PT
   if(/^[0-9]{4} ?[A-Z]{2}$/.test(s)) return true;                          // NL
@@ -657,25 +658,29 @@ function classifyGeoLabels(rawLabels){
 // choix du Tuning (w.geoCpCountry), sinon FR (5 chiffres) / BE (4 chiffres).
 function detectCpCountry(rawLabels, forced){
   if(forced&&forced!=="auto") return forced;
-  let gb=0,nl=0,pl=0,pt=0,d5=0,d4=0,dept=0;
+  let gb=0,nl=0,pl=0,pt=0,d5=0,d4=0,d6=0,lu=0,dept=0;
   rawLabels.forEach(function(l){
     if(l==null) return;
     const s=String(l).trim().toUpperCase();
     if(!s) return;
-    if(/^[A-Z]{1,2}[0-9]/.test(s)) gb++;
+    if(/^[A-Z]-[0-9]{4}$/.test(s)) lu++;
+    else if(/^[A-Z]{1,2}[0-9]/.test(s)) gb++;
     else if(/^[0-9]{4} ?[A-Z]{2}$/.test(s)) nl++;
     else if(/^[0-9]{2}-[0-9]{3}$/.test(s)) pl++;
     else if(/^[0-9]{4}-[0-9]{3}$/.test(s)) pt++;
+    else if(/^[0-9]{6}$/.test(s)) d6++;
     else if(/^[0-9]{5}$/.test(s)) d5++;
     else if(/^[0-9]{4}$/.test(s)) d4++;
     else if(/^2[AB]$/.test(s)||/^[0-9]{2,3}$/.test(s)) dept++;
   });
-  const m=Math.max(gb,nl,pl,pt,d5,d4,dept);
+  const m=Math.max(gb,nl,pl,pt,d5,d4,d6,lu,dept);
   if(!m) return "FR";
+  if(m===lu) return "LU";
   if(m===gb) return "GB";
   if(m===nl) return "NL";
   if(m===pl) return "PL";
   if(m===pt) return "PT";
+  if(m===d6) return "RO"; // 6 chiffres : RO/RU/BY — Roumanie par défaut, ajustable dans le Tuning
   if(m===dept||m===d5) return "FR";
   return "BE";
 }
@@ -735,8 +740,17 @@ function loadDeptFeatures(){
 let _placesPromise=null;
 function loadPlaces(){
   if(_placesPromise) return _placesPromise;
-  _placesPromise=fetchJsonWithFallback("widgets/geo-places.json")
-    .then(function(data){
+  // Base mondiale organisée (+ alias) + pack complet des villes d'Europe
+  // (GeoNames cities1000, ~69 000 communes, trié par population décroissante).
+  // La base passe en premier : ses indices restent valides pour les alias et
+  // ses entrées gagnent en cas d'homonymie.
+  _placesPromise=Promise.all([
+    fetchJsonWithFallback("widgets/geo-places.json"),
+    fetchJsonWithFallback("widgets/geo-cities/europe.json").catch(function(){ return {cities:[]}; })
+  ])
+    .then(function(res){
+      const base=res[0];
+      const data={cities:base.cities.concat((res[1]&&res[1].cities)||[]),aliases:base.aliases};
       const map={};
       data.cities.forEach(function(c,i){
         const k=fpgeoNorm(c[0]);
