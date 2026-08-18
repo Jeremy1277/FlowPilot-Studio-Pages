@@ -1437,48 +1437,80 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
       </div>
     </div>
 
-    <!-- Modal Colonne Calculée ─────────────────────────────────────────── -->
-    <div id="calc-col-modal" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:800;align-items:center;justify-content:center">
-      <div style="background:var(--card);border-radius:18px;width:min(520px,95vw);box-shadow:0 28px 72px rgba(13,27,42,.28);overflow:hidden;font-family:'DM Sans',sans-serif">
-        <div style="background:var(--navy);padding:16px 20px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:16px">✨</span>
-          <span style="font-weight:800;font-size:14px;color:#fff">Nouvelle colonne calculée</span>
-          <button onclick="closeCalcColModal()" style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer;line-height:1">✕</button>
+    <!-- Modal Colonne calculée -->
+    <div id="calc-col-modal" role="dialog" aria-modal="true" aria-labelledby="calc-col-title"
+         style="display:none;position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:800;align-items:center;justify-content:center;padding:16px">
+      <div style="background:var(--card);border-radius:18px;width:min(720px,96vw);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 28px 72px rgba(13,27,42,.28);overflow:hidden;font-family:'DM Sans',sans-serif">
+
+        <div style="background:var(--navy);padding:15px 20px;display:flex;align-items:center;gap:10px;flex:0 0 auto">
+          <span id="calc-col-title" style="font-weight:800;font-size:14px;color:#fff">Nouvelle colonne calculée</span>
+          <button onclick="closeCalcColModal()" aria-label="Fermer"
+            style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,.65);font-size:22px;cursor:pointer;line-height:1;padding:0 4px">&times;</button>
         </div>
-        <div style="padding:20px">
-          <label style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:8px">Décris la colonne à créer</label>
-          <textarea id="calc-col-desc" rows="3" placeholder="Ex: calcule l'âge en années depuis la colonne DATE NAISSANCE&#10;Ex: concatène NOM et PRÉNOM avec un espace&#10;Ex: classe le salaire en tranche : &lt;2000 / 2000-3500 / &gt;3500"
-            style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;font-family:'DM Sans',sans-serif;resize:vertical;outline:none;box-sizing:border-box"></textarea>
-          <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
-            <label style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Nom de la colonne</label>
-            <input id="calc-col-name" type="text" placeholder="ex: ÂGE, TRANCHE SALAIRE…"
-              style="flex:1;border:1px solid var(--border);border-radius:8px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none"/>
+
+        <!-- Onglets -->
+        <div role="tablist" style="display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--border);flex:0 0 auto">
+          <button role="tab" id="calc-tab-btn-sugg" aria-controls="calc-tab-sugg" aria-selected="true"
+                  onclick="calcColTab('sugg')" class="calc-tab calc-tab-on">Suggestions</button>
+          <button role="tab" id="calc-tab-btn-formule" aria-controls="calc-tab-formule" aria-selected="false"
+                  onclick="calcColTab('formule')" class="calc-tab">Formule</button>
+        </div>
+
+        <div style="padding:18px 20px;overflow:auto;flex:1 1 auto">
+
+          <!-- ── Onglet Suggestions ───────────────────────────────────── -->
+          <div id="calc-tab-sugg" role="tabpanel" aria-labelledby="calc-tab-btn-sugg">
+            <div id="calc-sugg-intro" style="font-size:12px;color:var(--mid);margin-bottom:12px"></div>
+            <div id="calc-sugg-list" style="display:grid;gap:8px"></div>
+            <div id="calc-sugg-empty" style="display:none;font-size:12px;color:var(--muted);padding:18px 0;text-align:center">
+              Rien à proposer sur ce fichier. Passe par l'onglet <strong>Formule</strong> pour écrire la tienne.
+            </div>
           </div>
-          <!-- Aperçu formule -->
-          <div id="calc-col-preview" style="display:none;margin-top:12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px">
-            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Formule générée</div>
-            <code id="calc-col-formula" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--navy);white-space:pre-wrap;word-break:break-all"></code>
-            <div style="margin-top:10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:4px">Aperçu (5 premières valeurs)</div>
+
+          <!-- ── Onglet Formule ───────────────────────────────────────── -->
+          <div id="calc-tab-formule" role="tabpanel" aria-labelledby="calc-tab-btn-formule" style="display:none">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              <label for="calc-col-manual-input" style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Formule</label>
+              <span style="flex:1"></span>
+              <span style="font-size:10.5px;color:var(--muted)">Syntaxe compatible Excel — <code>SI</code>, <code>GAUCHE</code>, <code>ARRONDI</code>… fonctionnent</span>
+            </div>
+            <textarea id="calc-col-manual-input" rows="3" spellcheck="false"
+              placeholder='SI([REMORQUE] = "L_TRUCK", "TRUCK", SUBSTITUE([REMORQUE], "L_TRUCK_", ""))'
+              style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;font-family:'DM Mono',monospace;resize:vertical;outline:none;box-sizing:border-box;background:var(--card2);color:var(--dark)"></textarea>
+            <div style="font-size:10.5px;color:var(--muted);margin-top:5px">
+              Une colonne s'écrit entre crochets : <code>[CA]</code>. Opérateurs <code>+ - * /</code>, comparaisons, <code>&amp;</code> pour concaténer.
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+              <button class="btn btn-primary" type="button" onclick="calcColTestManual()">Tester la formule</button>
+              <button type="button" onclick="fpToggleFormulaHelp()"
+                style="background:none;border:none;color:var(--mid);font-size:11px;cursor:pointer;padding:0;text-decoration:underline;font-family:inherit">Fonctions disponibles</button>
+              <button type="button" onclick="fpToggleColumnList()"
+                style="background:none;border:none;color:var(--mid);font-size:11px;cursor:pointer;padding:0;text-decoration:underline;font-family:inherit">Colonnes du fichier</button>
+            </div>
+            <div id="calc-col-collist" style="display:none;margin-top:8px;max-height:160px;overflow:auto;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px"></div>
+            <div id="calc-col-fnhelp" style="display:none;margin-top:8px;max-height:220px;overflow:auto;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px"></div>
+          </div>
+
+          <!-- ── Zone commune : erreur, contrôle, nom ─────────────────── -->
+          <div id="calc-col-err" role="alert" style="display:none;color:var(--coral);font-size:12px;margin-top:12px;background:rgba(255,111,97,.08);border:1px solid rgba(255,111,97,.3);border-radius:8px;padding:9px 11px"></div>
+
+          <div id="calc-col-preview" style="display:none;margin-top:14px;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:13px">
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Formule appliquée</div>
+            <code id="calc-col-formula" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--navy);white-space:pre-wrap;word-break:break-word;display:block"></code>
+            <div id="calc-col-checktitle" style="margin-top:12px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:5px"></div>
             <div id="calc-col-samples" style="font-size:12px;color:var(--dark)"></div>
           </div>
-          <div id="calc-col-err" style="display:none;color:var(--coral);font-size:12px;margin-top:8px"></div>
-          <!-- Mode manuel : écrire/coller la formule sans IA -->
-          <button type="button" id="calc-col-manual-toggle" onclick="calcColToggleManual()" style="background:none;border:none;color:var(--mid);font-size:11px;cursor:pointer;padding:0;margin-top:10px;text-decoration:underline;font-family:inherit">✍️ Écrire la formule moi-même (sans IA)</button>
-          <div id="calc-col-manual" style="display:none;margin-top:10px">
-            <textarea id="calc-col-manual-input" rows="3" spellcheck="false" placeholder="[CA] / [Distance KM]"
-              style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11px;font-family:'DM Mono',monospace;resize:vertical;outline:none;box-sizing:border-box;background:var(--card2);color:var(--dark)"></textarea>
-            <div style="font-size:10px;color:var(--muted);margin-top:5px">Une colonne s'écrit entre crochets : <code>[CA]</code>. Opérateurs <code>+ - * /</code>, comparaisons, <code>&amp;</code> pour concaténer. Ex. <code>IF([Marge] &gt; 0, "OK", "Perte")</code></div>
-            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
-              <button class="btn" type="button" onclick="calcColTestManual()">▶ Tester la formule</button>
-              <button type="button" onclick="fpToggleFormulaHelp()" style="background:none;border:none;color:var(--mid);font-size:11px;cursor:pointer;padding:0;text-decoration:underline;font-family:inherit">📖 Fonctions disponibles</button>
-            </div>
-            <div id="calc-col-fnhelp" style="display:none;margin-top:8px;max-height:200px;overflow:auto;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px"></div>
+
+          <div id="calc-col-namerow" style="display:none;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap">
+            <label for="calc-col-name" style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Nom de la colonne</label>
+            <input id="calc-col-name" type="text" placeholder="ex. Type de remorque"
+              style="flex:1;min-width:180px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none"/>
           </div>
-          
         </div>
-        <div style="padding:0 20px 20px;display:flex;gap:10px;justify-content:flex-end">
+
+        <div style="padding:14px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);flex:0 0 auto">
           <button class="btn" onclick="closeCalcColModal()">Annuler</button>
-          <button class="btn btn-primary" id="calc-col-apply-btn" onclick="calcColApply()" style="display:none">✓ Ajouter la colonne</button>
+          <button class="btn btn-primary" id="calc-col-apply-btn" onclick="calcColApply()" style="display:none">Ajouter la colonne</button>
         </div>
       </div>
     </div>
@@ -6954,6 +6986,25 @@ tr:nth-child(even) td{background:var(--card2)}
 /* Panneau options dans la modale Modifier */
 #bar-options-panel{padding:0 20px 16px;border-top:1px solid var(--border);margin-top:8px}
 #bar-options-panel-title{font-size:11px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.1em;padding:10px 20px 6px;background:var(--accent-soft)}
+
+    /* Onglets de la modale « colonne calculée » */
+    .calc-tab{background:none;border:none;border-bottom:2px solid transparent;padding:11px 14px;font-size:12px;
+      font-weight:700;color:var(--muted);cursor:pointer;font-family:inherit;margin-bottom:-1px;transition:color .15s,border-color .15s}
+    .calc-tab:hover{color:var(--mid)}
+    .calc-tab-on{color:var(--navy);border-bottom-color:var(--navy)}
+    .calc-sugg{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;background:var(--card2);
+      border:1px solid var(--border);border-radius:12px;padding:12px 13px;cursor:pointer;font-family:inherit;
+      transition:border-color .15s,box-shadow .15s}
+    .calc-sugg:hover{border-color:var(--navy);box-shadow:0 4px 14px rgba(13,27,42,.08)}
+    .calc-sugg-on{border-color:var(--navy);box-shadow:0 4px 14px rgba(13,27,42,.10)}
+    .calc-sugg-cat{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+    .calc-sugg-lab{font-size:13px;font-weight:700;color:var(--dark);margin-top:2px}
+    .calc-sugg-why{font-size:11px;color:var(--mid);margin-top:3px;line-height:1.45}
+    .calc-check td{padding:3px 8px 3px 0;border-bottom:1px solid var(--border);vertical-align:top}
+    .calc-check-n{color:var(--muted);font-size:11px;text-align:right;white-space:nowrap}
+    .calc-check-from{font-family:'DM Mono',monospace;font-size:11px;color:var(--mid);word-break:break-all}
+    .calc-check-to{font-family:'DM Mono',monospace;font-size:11px;color:var(--navy);font-weight:600;word-break:break-all}
+    .calc-check-null{color:var(--coral);font-style:italic;font-weight:400}
 </style></head><body>
 <div class="topbar">
   <div class="brand"><div class="brand-logo">F</div>Flow<span>Pilot</span> — ${esc(name)}</div>
@@ -11500,11 +11551,21 @@ function tblSortBy(col){
   renderTable();
 }
 
-/* ── Modal colonne calculée ── */
+/* ── Modal colonne calculée ──────────────────────────────────────────────
+   Deux entrées : les suggestions produites par widgets/suggest-columns.js
+   (chemin principal, aucune syntaxe à connaître) et l'écriture libre d'une
+   formule (chemin expert, syntaxe compatible Excel).
 
-// Compile une formule dans le langage restreint de widgets/formula.js.
-// Remplace les anciens `new Function` : aucune exécution de code arbitraire.
-let _calcColCompiled = null;
+   Aucune IA, aucun appel réseau : tout est calculé sur les données déjà
+   chargées dans le navigateur.                                            */
+
+let _calcColCompiled = null;    // formule compilée en attente de validation
+let _calcColSource   = null;    // colonne d'origine, pour la table de contrôle
+let _calcColTab      = 'sugg';
+let _calcSuggestions = [];
+
+/** Compile une formule dans le langage restreint de widgets/formula.js.
+ *  Remplace les anciens `new Function` : aucune exécution de code arbitraire. */
 function fpCompileCalcCol(source){
   if(typeof window.FP_compileFormula !== 'function'){
     return { ok:false, error:{ message:"Le moteur de formules n'est pas encore chargé — réessaie dans un instant." } };
@@ -11512,90 +11573,258 @@ function fpCompileCalcCol(source){
   return window.FP_compileFormula(source, columns.map(c => ({ name:c.name, type:c.type })));
 }
 
-// Évalue la formule compilée sur les n premières lignes, pour l'aperçu.
-function fpPreviewCalcCol(compiled, n){
-  return rows.slice(0, n).map(r => compiled.evaluate(r, { parseDateValue }));
+function calcColEl(id){ return document.getElementById(id); }
+
+function calcColTab(tab){
+  _calcColTab = tab;
+  ['sugg','formule'].forEach(t => {
+    const panel = calcColEl('calc-tab-' + t);
+    const btn   = calcColEl('calc-tab-btn-' + t);
+    if(panel) panel.style.display = (t === tab) ? '' : 'none';
+    if(btn){
+      btn.classList.toggle('calc-tab-on', t === tab);
+      btn.setAttribute('aria-selected', String(t === tab));
+    }
+  });
+  // Changer d'onglet annule la sélection en cours : on ne veut pas ajouter
+  // une colonne issue d'un onglet avec le nom saisi dans l'autre.
+  calcColReset();
+}
+
+/** Remet à zéro tout ce qui dépend d'une formule en attente. */
+function calcColReset(){
+  _calcColCompiled = null;
+  _calcColSource   = null;
+  const hide = id => { const e = calcColEl(id); if(e) e.style.display = 'none'; };
+  hide('calc-col-preview'); hide('calc-col-err'); hide('calc-col-apply-btn'); hide('calc-col-namerow');
+  document.querySelectorAll('.calc-sugg-on').forEach(el => el.classList.remove('calc-sugg-on'));
+}
+
+function calcColError(msg){
+  const err = calcColEl('calc-col-err');
+  if(!err) return;
+  err.textContent = msg;
+  err.style.display = '';
 }
 
 function openCalcColModal(){
-  document.getElementById('calc-col-modal').style.display = 'flex';
-  document.getElementById('calc-col-desc').value = '';
-  document.getElementById('calc-col-name').value = '';
-  document.getElementById('calc-col-preview').style.display = 'none';
-  document.getElementById('calc-col-err').style.display = 'none';
-  document.getElementById('calc-col-apply-btn').style.display = 'none';
-  document.getElementById('calc-col-gen-btn').style.display = '';
-  _calcColFormula = '';
-  _calcColCompiled = null;
+  const modal = calcColEl('calc-col-modal');
+  if(!modal) return;
+  modal.style.display = 'flex';
+  const input = calcColEl('calc-col-manual-input'); if(input) input.value = '';
+  const name  = calcColEl('calc-col-name');         if(name)  name.value  = '';
+  const help  = calcColEl('calc-col-fnhelp');       if(help)  help.style.display = 'none';
+  const cols  = calcColEl('calc-col-collist');      if(cols)  cols.style.display = 'none';
+  calcColTab('sugg');
+  renderCalcSuggestions();
 }
 
 function closeCalcColModal(){
-  document.getElementById('calc-col-modal').style.display = 'none';
+  const modal = calcColEl('calc-col-modal');
+  if(modal) modal.style.display = 'none';
+  calcColReset();
 }
 
+/* ── Suggestions ─────────────────────────────────────────────────────── */
 
-// Aide en ligne : catalogue des fonctions du langage de formules.
-function fpToggleFormulaHelp(){
-  const box=document.getElementById('calc-col-fnhelp');
-  if(!box) return;
-  if(box.style.display!=='none'){ box.style.display='none'; return; }
-  const fns=window.FP_FORMULA_FUNCTIONS||[];
-  if(!fns.length){ box.innerHTML='<div style="font-size:11px;color:var(--muted)">Catalogue indisponible.</div>'; box.style.display=''; return; }
-  const byCat={};
-  fns.forEach(f=>{ (byCat[f.category]=byCat[f.category]||[]).push(f); });
-  box.innerHTML=Object.keys(byCat).map(cat=>
-    `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:8px 0 4px">${esc(cat)}</div>`+
-    byCat[cat].map(f=>
-      `<div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">`+
-      `<code style="font-family:'DM Mono',monospace;color:var(--navy)">${esc(f.signature)}</code>`+
-      `<div style="color:var(--mid);font-size:10.5px;margin-top:1px">${esc(f.description)}</div></div>`
-    ).join('')
-  ).join('');
-  box.style.display='';
-}
+function renderCalcSuggestions(){
+  const list  = calcColEl('calc-sugg-list');
+  const empty = calcColEl('calc-sugg-empty');
+  const intro = calcColEl('calc-sugg-intro');
+  if(!list) return;
 
-function calcColToggleManual(){
-  const box=document.getElementById('calc-col-manual');
-  if(!box) return;
-  const show=box.style.display==='none';
-  box.style.display=show?'':'none';
-  if(show){ const ta=document.getElementById('calc-col-manual-input'); if(ta) setTimeout(()=>ta.focus(),50); }
-}
+  _calcSuggestions = [];
+  if(typeof window.FP_suggestColumns === 'function' && rows.length){
+    try {
+      _calcSuggestions = window.FP_suggestColumns({
+        columns, rows,
+        compile: window.FP_compileFormula,
+        helpers: { parseDateValue },
+      });
+    } catch(e){ _calcSuggestions = []; }
+  }
 
-function calcColTestManual(){
-  const err=document.getElementById('calc-col-err');
-  const ta=document.getElementById('calc-col-manual-input');
-  const formula=(ta?ta.value:'').trim();
-  if(!formula){ err.textContent='Écris une formule d\'abord.'; err.style.display=''; return; }
-  const compiled=fpCompileCalcCol(formula);
-  if(!compiled.ok){
-    const pos=compiled.error.position;
-    err.textContent='❌ '+compiled.error.message+(pos!=null?` (caractère ${pos+1})`:'');
-    err.style.display='';
-    document.getElementById('calc-col-preview').style.display='none';
-    document.getElementById('calc-col-apply-btn').style.display='none';
+  if(!_calcSuggestions.length){
+    list.innerHTML = '';
+    if(empty) empty.style.display = '';
+    if(intro) intro.textContent = '';
     return;
   }
-  _calcColCompiled=compiled;
-  _calcColFormula=compiled.normalized||formula;
-  _calcColType=compiled.type||'text';
-  const samples=fpPreviewCalcCol(compiled,5);
-  document.getElementById('calc-col-formula').textContent=_calcColFormula;
-  document.getElementById('calc-col-samples').innerHTML=samples.map((v,i)=>
-    `<div style="padding:2px 0;border-bottom:1px solid var(--border)">Ligne ${i+1} → <strong>${esc(String(v??'—'))}</strong></div>`
+  if(empty) empty.style.display = 'none';
+  if(intro){
+    intro.textContent = _calcSuggestions.length + ' colonne' + (_calcSuggestions.length > 1 ? 's' : '')
+      + ' calculable' + (_calcSuggestions.length > 1 ? 's' : '')
+      + ' à partir de tes données. Chacune a été testée sur le fichier avant d\u2019être proposée.';
+  }
+
+  list.innerHTML = _calcSuggestions.map((sg, i) =>
+    `<button type="button" class="calc-sugg" id="calc-sugg-${i}" onclick="calcColPickSuggestion(${i})">
+       <div style="flex:1;min-width:0">
+         <div class="calc-sugg-cat">${esc(sg.category)}</div>
+         <div class="calc-sugg-lab">${esc(sg.label)}</div>
+         <div class="calc-sugg-why">${esc(sg.why)}</div>
+       </div>
+     </button>`
   ).join('');
-  document.getElementById('calc-col-preview').style.display='';
-  document.getElementById('calc-col-apply-btn').style.display='';
-  err.style.display='none';
 }
 
+function calcColPickSuggestion(i){
+  const sg = _calcSuggestions[i];
+  if(!sg) return;
+  calcColReset();
+  const card = calcColEl('calc-sugg-' + i);
+  if(card) card.classList.add('calc-sugg-on');
+
+  _calcColCompiled = sg.compiled;
+  _calcColSource   = sg.sourceColumn || null;
+  const nameInput  = calcColEl('calc-col-name');
+  if(nameInput) nameInput.value = sg.name;
+  calcColShowPreview(sg.formula);
+}
+
+/* ── Formule libre ───────────────────────────────────────────────────── */
+
+function calcColTestManual(){
+  calcColReset();
+  const ta = calcColEl('calc-col-manual-input');
+  const formula = (ta ? ta.value : '').trim();
+  if(!formula){ calcColError('Écris une formule d\u2019abord.'); return; }
+
+  const compiled = fpCompileCalcCol(formula);
+  if(!compiled.ok){
+    const pos = compiled.error.position;
+    calcColError(compiled.error.message + (pos != null ? ` (caractère ${pos + 1})` : ''));
+    return;
+  }
+  _calcColCompiled = compiled;
+  // Une formule mono-colonne permet la table de contrôle par valeur distincte.
+  _calcColSource = (compiled.columns && compiled.columns.length === 1) ? compiled.columns[0] : null;
+  calcColShowPreview(compiled.normalized || formula);
+}
+
+/* ── Aperçu / table de contrôle ──────────────────────────────────────── */
+
+function calcColShowPreview(displayFormula){
+  const box = calcColEl('calc-col-preview');
+  if(!box || !_calcColCompiled) return;
+
+  calcColEl('calc-col-formula').textContent = displayFormula;
+
+  const helpers = { parseDateValue };
+  let pv = null;
+  if(typeof window.FP_previewFormula === 'function'){
+    try { pv = window.FP_previewFormula(_calcColCompiled, rows, _calcColSource, helpers); }
+    catch(e){ pv = null; }
+  }
+
+  const title = calcColEl('calc-col-checktitle');
+  const out   = calcColEl('calc-col-samples');
+  const fmt   = v => (v === null || v === undefined || v === '')
+    ? '<span class="calc-check-null">vide</span>'
+    : esc(String(v));
+
+  if(pv && pv.kind === 'table'){
+    // Le cas qui compte : peu de valeurs distinctes en entrée, donc on peut
+    // montrer TOUS les cas et leur résultat. C'est là qu'on voit d'un coup
+    // d'œil les valeurs qu'une formule n'a pas traitées — ce qu'un aperçu de
+    // cinq lignes ne montrerait jamais sur un cas à 1 % du volume.
+    if(title) title.textContent = 'Contrôle — toutes les valeurs de « ' + _calcColSource + ' »';
+    out.innerHTML = '<table class="calc-check" style="width:100%;border-collapse:collapse">'
+      + pv.rows.map(r =>
+          `<tr><td class="calc-check-n">${r.count.toLocaleString('fr-FR')}</td>`
+        + `<td class="calc-check-from">${fmt(r.from)}</td>`
+        + `<td style="color:var(--muted);padding:0 4px">→</td>`
+        + `<td class="calc-check-to">${fmt(r.to)}</td></tr>`
+        ).join('')
+      + '</table>';
+  } else if(pv && pv.kind === 'lines'){
+    if(title) title.textContent = 'Aperçu';
+    out.innerHTML = pv.rows.map((r, i) =>
+      `<div style="padding:3px 0;border-bottom:1px solid var(--border)">`
+      + `<span style="color:var(--muted);font-size:11px">Ligne ${i + 1}</span> `
+      + `<strong class="calc-check-to">${fmt(r.to)}</strong></div>`
+    ).join('');
+  } else {
+    if(title) title.textContent = 'Aperçu';
+    out.innerHTML = rows.slice(0, 5).map((r, i) =>
+      `<div style="padding:3px 0;border-bottom:1px solid var(--border)">`
+      + `<span style="color:var(--muted);font-size:11px">Ligne ${i + 1}</span> `
+      + `<strong class="calc-check-to">${fmt(_calcColCompiled.evaluate(r, helpers))}</strong></div>`
+    ).join('');
+  }
+
+  box.style.display = '';
+  const nameRow = calcColEl('calc-col-namerow'); if(nameRow) nameRow.style.display = 'flex';
+  const apply   = calcColEl('calc-col-apply-btn'); if(apply) apply.style.display = '';
+}
+
+/* ── Aides en ligne ──────────────────────────────────────────────────── */
+
+function fpToggleFormulaHelp(){
+  const box = calcColEl('calc-col-fnhelp');
+  if(!box) return;
+  if(box.style.display !== 'none'){ box.style.display = 'none'; return; }
+  const fns = window.FP_FORMULA_FUNCTIONS || [];
+  if(!fns.length){
+    box.innerHTML = '<div style="font-size:11px;color:var(--muted)">Catalogue indisponible.</div>';
+    box.style.display = ''; return;
+  }
+  const byCat = {};
+  fns.forEach(f => { (byCat[f.category] = byCat[f.category] || []).push(f); });
+  box.innerHTML = Object.keys(byCat).map(cat =>
+    `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:8px 0 4px">${esc(cat)}</div>`
+    + byCat[cat].map(f =>
+        `<div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">`
+      + `<code style="font-family:'DM Mono',monospace;color:var(--navy)">${esc(f.signature)}</code>`
+      + `<div style="color:var(--mid);font-size:10.5px;margin-top:1px">${esc(f.description)}</div></div>`
+    ).join('')
+  ).join('');
+  box.style.display = '';
+}
+
+/** Liste des colonnes du fichier, cliquables : évite les fautes de frappe
+ *  dans les noms, première cause d'échec de compilation. */
+function fpToggleColumnList(){
+  const box = calcColEl('calc-col-collist');
+  if(!box) return;
+  if(box.style.display !== 'none'){ box.style.display = 'none'; return; }
+  box.innerHTML = columns.map(c => {
+    const kind = c.type === 'number' ? 'nombre' : c.type === 'date' ? 'date' : 'texte';
+    return `<button type="button" onclick="calcColInsert('[${esc(c.name).replace(/'/g,'&#39;')}]')"
+      style="display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);
+      padding:4px 0;cursor:pointer;font-family:inherit">
+      <code style="font-family:'DM Mono',monospace;font-size:11px;color:var(--navy)">[${esc(c.name)}]</code>
+      <span style="color:var(--muted);font-size:10.5px;margin-left:6px">${kind}</span></button>`;
+  }).join('');
+  box.style.display = '';
+}
+
+/** Insère un fragment à la position du curseur dans le champ formule. */
+function calcColInsert(text){
+  const ta = calcColEl('calc-col-manual-input');
+  if(!ta) return;
+  const start = ta.selectionStart ?? ta.value.length;
+  const end   = ta.selectionEnd   ?? ta.value.length;
+  ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
+  ta.focus();
+  ta.selectionStart = ta.selectionEnd = start + text.length;
+}
+
+/* ── Application ─────────────────────────────────────────────────────── */
 
 function calcColApply(){
-  const name = document.getElementById('calc-col-name').value.trim();
-  if(!name || !_calcColCompiled) return;
+  const nameInput = calcColEl('calc-col-name');
+  const name = nameInput ? nameInput.value.trim() : '';
+  if(!_calcColCompiled){ calcColError('Teste la formule avant de l\u2019ajouter.'); return; }
+  if(!name){ calcColError('Donne un nom à la colonne.'); if(nameInput) nameInput.focus(); return; }
+  if(columns.some(c => c.name.toLowerCase() === name.toLowerCase())){
+    calcColError('Une colonne « ' + name + ' » existe déjà. Choisis un autre nom.');
+    if(nameInput) nameInput.focus();
+    return;
+  }
 
-  // Appliquer la formule compilée à toutes les lignes. evaluate() ne jette
-  // jamais : une valeur incalculable ressort à null.
+  // Application à toutes les lignes. evaluate() ne jette jamais : une valeur
+  // incalculable ressort à null.
   const helpers = { parseDateValue };
   let errors = 0;
   rows.forEach(r => {
@@ -11604,17 +11833,28 @@ function calcColApply(){
     r[name] = v;
   });
 
-  // Ajouter la colonne à columns
-  if(!columns.find(c=>c.name===name)){
-    columns.push({ name, type: _calcColType, _computed: true });
+  columns.push({ name, type: _calcColCompiled.type || 'text', _computed: true });
+  if(typeof classifyColumn === 'function'){
+    // La nouvelle colonne doit être classée comme les autres, sinon elle
+    // n'apparaît ni dans les recommandations ni dans les listes de mesures.
+    try {
+      const model = classifyColumn(columns[columns.length - 1]);
+      fieldModels[name] = model;
+      Object.assign(columns[columns.length - 1], {
+        fieldRole: model && model.role,
+        businessType: model && model.businessType,
+      });
+    } catch(e){ /* la colonne reste utilisable même sans classification */ }
   }
 
   clearAggregationCache();
   closeCalcColModal();
   renderTable();
+  if(typeof buildSidebar === 'function'){ try { buildSidebar(); } catch(e){} }
 
-  const msg = errors > 0 ? `⚠ Colonne "${name}" ajoutée — ${errors} ligne(s) sans résultat` : `✓ Colonne "${name}" ajoutée — disponible dans tous les widgets`;
-  toast(msg);
+  toast(errors > 0
+    ? `Colonne « ${name} » ajoutée — ${errors.toLocaleString('fr-FR')} ligne(s) sans résultat`
+    : `Colonne « ${name} » ajoutée — disponible dans tous les widgets`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -11833,6 +12073,7 @@ import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widget
 import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js';
 import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js';
 import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js';
+import { suggestColumns, previewFormula } from './widgets/suggest-columns.js';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
@@ -11844,6 +12085,8 @@ window.FP_keyToStart       = keyToStart;
 window.FP_periodLabel      = periodLabel;
 window.FP_TIME_COMPARE_MODES = TIME_COMPARE_MODES;
 window.FP_TIME_CUMUL_MODES   = TIME_CUMUL_MODES;
+window.FP_suggestColumns   = suggestColumns;
+window.FP_previewFormula   = previewFormula;
 window.FP_compileFormula   = compileFormula;
 window.FP_FORMULA_FUNCTIONS= FORMULA_FUNCTIONS;
 window.FP_PROMPT_GRAMMAR   = PROMPT_GRAMMAR;

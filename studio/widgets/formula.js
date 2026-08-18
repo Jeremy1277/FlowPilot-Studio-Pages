@@ -229,8 +229,12 @@ function tokenize(source) {
     }
 
     // Erreurs fréquentes, avec un message qui explique quoi faire
+    // « = » seul : accepté comme égalité. Une formule est une expression, il n'y
+    // a pas d'affectation possible — autant accepter ce qu'un utilisateur Excel tape.
     if (ch === '=') {
-      throw new FormulaError('Pour tester une égalité, écris « == » (deux signes égal).', i);
+      tokens.push({ type: 'op', value: '==', pos: i });
+      i++;
+      continue;
     }
     if (ch === '.') {
       throw new FormulaError('Le point « . » n\'existe pas dans les formules. Pour une colonne, écris [Nom de colonne].', i);
@@ -253,6 +257,33 @@ function tokenize(source) {
 // `lazy: true` = les arguments ne sont PAS pré-évalués (IF, AND, OR, COALESCE),
 // ce qui permet à IF([KM] > 0, [CA] / [KM], 0) de ne pas calculer la branche
 // morte, et à AND/OR de court-circuiter.
+/**
+ * Alias Excel. Les noms de fonctions ne sont pas protégeables (ce sont des
+ * mots fonctionnels), et un utilisateur qui connaît Excel doit pouvoir taper
+ * ce qu'il a dans les doigts. L'anglais partage déjà l'essentiel des noms :
+ * cette table couvre surtout Excel francophone.
+ *
+ * Ce ne sont que des synonymes de surface : même fonction, même sémantique.
+ * Aucune tentative d'imiter DAX, dont le modèle (contexte de ligne, contexte
+ * de filtre) n'existe pas ici — mieux vaut ne pas l'offrir que le faire faux.
+ */
+const FUNCTION_ALIASES = {
+  // Logique
+  SI: 'IF', ET: 'AND', OU: 'OR', NON: 'NOT', ESTVIDE: 'ISBLANK',
+  // Texte
+  GAUCHE: 'LEFT', DROITE: 'RIGHT', STXT: 'MID', NBCAR: 'LEN',
+  MAJUSCULE: 'UPPER', MINUSCULE: 'LOWER', SUPPRESPACE: 'TRIM',
+  CONCATENER: 'CONCAT', SUBSTITUE: 'REPLACE', 'SUBSTITUTE': 'REPLACE',
+  // Maths
+  ARRONDI: 'ROUND', ENT: 'FLOOR', PLAFOND: 'CEIL', PLANCHER: 'FLOOR',
+  PUISSANCE: 'POW', RACINE: 'SQRT', SIGNE: 'SIGN',
+  // Dates
+  ANNEE: 'YEAR', MOIS: 'MONTH', JOUR: 'DAY', JOURSEM: 'WEEKDAY',
+  AUJOURDHUI: 'TODAY', "AUJOURD'HUI": 'TODAY', NOSEM: 'WEEK',
+  // Conversion
+  CNUM: 'NUMBER', TEXTE: 'TEXT',
+};
+
 const FUNCTIONS = {};
 
 function defineFunction(spec) {
@@ -415,7 +446,7 @@ function isoWeek(d) {
   return Math.ceil((((tmp.getTime() - yearStart) / 86400000) + 1) / 7);
 }
 
-const DATE_FORMATS = ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/YYYY', 'YYYY'];
+const DATE_FORMATS = ['YYYY-MM-DD', 'YYYY-MM', 'DD/MM/YYYY', 'MM/YYYY', 'YYYY'];
 
 function pad2(n) {
   return n < 10 ? '0' + n : String(n);
@@ -426,6 +457,7 @@ function formatDate(d, fmt) {
   switch (fmt) {
     case 'YYYY-MM-DD': return y + '-' + m + '-' + day;
     case 'DD/MM/YYYY': return day + '/' + m + '/' + y;
+    case 'YYYY-MM':    return y + '-' + m;
     case 'MM/YYYY':    return m + '/' + y;
     case 'YYYY':       return String(y);
     default:           return null;
@@ -861,7 +893,7 @@ defineFunction({
 
 defineFunction({
   name: 'FORMATDATE', category: 'Dates', min: 2, max: 2, returns: 'text',
-  signature: 'FORMATDATE(date, format)', description: 'Formate une date : "YYYY-MM-DD", "DD/MM/YYYY", "MM/YYYY" ou "YYYY".',
+  signature: 'FORMATDATE(date, format)', description: 'Formate une date : "YYYY-MM-DD", "YYYY-MM", "DD/MM/YYYY", "MM/YYYY" ou "YYYY".',
   example: 'FORMATDATE([Date chargement], "MM/YYYY")',
   literalArg: { index: 1, values: DATE_FORMATS, label: 'format', caseSensitive: true },
   impl: (a, ctx) => {
@@ -1064,7 +1096,10 @@ function createParser(tokens, source, columnIndex) {
 
   /* ── Appel de fonction : allowlist stricte ── */
   function parseCall(nameToken) {
-    const upper = String(nameToken.value).toUpperCase();
+    const typed = String(nameToken.value).toUpperCase();
+    const upper = Object.prototype.hasOwnProperty.call(FUNCTION_ALIASES, typed)
+      ? FUNCTION_ALIASES[typed]
+      : typed;
     const spec  = Object.prototype.hasOwnProperty.call(FUNCTIONS, upper) ? FUNCTIONS[upper] : null;
     if (!spec) {
       const near = closestNames(upper, FUNCTION_NAMES, 2);
@@ -1638,7 +1673,7 @@ function buildPromptGrammar() {
     '',
     'RÈGLES',
     '- DATEDIFF(date1, date2, unité) renvoie date1 − date2 ; unité = "day" (défaut), "week", "month" ou "year".',
-    '- FORMATDATE n\'accepte que "YYYY-MM-DD", "DD/MM/YYYY", "MM/YYYY", "YYYY".',
+    '- FORMATDATE n\'accepte que "YYYY-MM-DD", "YYYY-MM", "DD/MM/YYYY", "MM/YYYY", "YYYY".',
     '- Une division par zéro ou une valeur illisible renvoie automatiquement un vide : inutile de la tester,',
     '  sauf si tu veux une valeur de repli (utilise alors IF ou COALESCE).',
     '- Maximum 2000 caractères, 500 éléments, 100 niveaux d\'imbrication.',
