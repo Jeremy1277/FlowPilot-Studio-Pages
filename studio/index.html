@@ -1339,6 +1339,16 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
             <input type="file" id="file-input" accept=".xlsx,.xls,.xlsm,.csv" style="display:none" onchange="handleFile(this.files[0])"/>
           </div>
 
+          <button type="button" id="fp-url-btn" onclick="fpAskUrl()"
+            style="width:100%;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px;
+            background:var(--card);border:1px solid var(--border);border-radius:11px;padding:11px 14px;
+            font-family:inherit;font-size:12.5px;font-weight:700;color:var(--mid);cursor:pointer"
+            onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--dark)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--mid)'">
+            <svg class="ui-svg" style="width:16px;height:16px;color:var(--accent)"><use href="#i-data"></use></svg>
+            Charger depuis un lien (Google Sheets, CSV…)
+          </button>
+
           <!-- Fichiers récents : réouverture directe du fichier, données à jour -->
           <div id="fp-recent-block" style="display:none;margin-top:14px">
             <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Fichiers récents</div>
@@ -3537,8 +3547,10 @@ function xlsxWorkerCall(msg, expect, transfer){
 
 function handleFile(file){
   if(!file) return;
-  window.__fpLastFileMeta={name:file.name, size:file.size, handle:window.__fpPendingHandle||null};
+  window.__fpLastFileMeta={name:file.name, size:file.size,
+    handle:window.__fpPendingHandle||null, url:window.__fpPendingUrl||null};
   window.__fpPendingHandle=null;
+  window.__fpPendingUrl=null;
   fpLoadUI(true,'Lecture de « '+file.name+' »…','Ouverture du fichier');
   fpLoadCreep(18);
   const reader=new FileReader();
@@ -3637,6 +3649,7 @@ async function loadSheetFromSource(source, sheetInfo, fileName, showSheetInName)
     if(typeof openQuality === 'function') openQuality();
     try{ fpHistoryAdd({name:fileName, sheet:showSheetInName?sheetInfo.name:null,
       rows:parsed.length, size:(window.__fpLastFileMeta&&window.__fpLastFileMeta.size)||null,
+      url:(window.__fpLastFileMeta&&window.__fpLastFileMeta.url)||null,
       date:Date.now()}, window.__fpLastFileMeta&&window.__fpLastFileMeta.handle);
       if(typeof fpRenderRecentFiles==='function') fpRenderRecentFiles(); }catch(e){}
   }catch(err){
@@ -12229,6 +12242,142 @@ function calcColApply(){
 // ═══════════════════════════════════════════════════════════════════════
 
 // ── Ouverture de fichier avec accès direct quand le navigateur le permet ──
+/* ── Chargement depuis un lien ───────────────────────────────────────────
+   Un Google Sheet n'est pas un fichier : il n'existe pas sur le disque, donc
+   ni sélecteur ni handle. En revanche Google expose ses feuilles en CSV via
+   l'endpoint `gviz`, qui est le seul à envoyer les en-têtes CORS permettant
+   à un navigateur de le lire depuis un autre domaine.
+
+   Condition indispensable : la feuille doit être partagée « Tous les
+   utilisateurs disposant du lien ». Sur un document privé, Google renvoie une
+   page de connexion — jamais les données. Le message d'erreur le dit
+   explicitement plutôt que de laisser un échec muet.
+
+   Avantage collatéral sur les fichiers locaux : une URL est retéléchargée à
+   chaque ouverture. Une entrée « lien » dans les récents est donc TOUJOURS à
+   jour, sans permission à redemander.                                       */
+
+/** Transforme une URL de partage en URL de données téléchargeable.
+ *  @returns {{url:string, name:string, ext:string, source:string}|null} */
+function fpResolveDataUrl(raw){
+  const input = String(raw || '').trim();
+  if(!input) return null;
+
+  // Google Sheets : .../spreadsheets/d/<ID>/edit#gid=<GID>
+  const gs = input.match(/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)/);
+  if(gs){
+    const id = gs[1];
+    const gidMatch = input.match(/[#&?]gid=([0-9]+)/);
+    const gid = gidMatch ? gidMatch[1] : '0';
+    return {
+      url: 'https://docs.google.com/spreadsheets/d/' + id + '/gviz/tq?tqx=out:csv&gid=' + gid,
+      name: 'Google Sheet',
+      ext: 'csv',
+      source: 'google',
+    };
+  }
+
+  if(!/^https?:\/\//i.test(input)) return null;
+
+  let path = input;
+  try { path = new URL(input).pathname; } catch(e){}
+  const m = path.match(/\/([^\/?#]+)\.(csv|tsv|xlsx|xlsm|xls)$/i);
+  return {
+    url: input,
+    name: m ? m[1] + '.' + m[2].toLowerCase() : 'donnees-distantes',
+    ext: m ? m[2].toLowerCase() : 'csv',
+    source: 'url',
+  };
+}
+
+/** Télécharge une URL et la fait entrer dans le pipeline habituel.
+ *  Le contenu devient un File : tout ce qui suit (parsing, feuilles, qualité,
+ *  colonnes calculées) est strictement le même code que pour un fichier local. */
+async function fpLoadFromUrl(raw, silent){
+  const target = fpResolveDataUrl(raw);
+  if(!target){
+    if(!silent) toast('Lien non reconnu — colle une URL http(s) ou un lien Google Sheets');
+    return false;
+  }
+
+  fpLoadUI(true, 'Téléchargement', target.source === 'google' ? 'Lecture de la feuille Google' : 'Lecture du lien');
+  fpLoadCreep(20);
+  try{
+    const res = await fetch(target.url, { redirect: 'follow', credentials: 'omit' });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const buf = await res.arrayBuffer();
+
+    // Google renvoie une page HTML de connexion quand la feuille est privée :
+    // le statut est 200, mais le contenu n'est pas des données.
+    const head = new TextDecoder().decode(new Uint8Array(buf.slice(0, 200))).toLowerCase();
+    if(head.includes('<!doctype html') || head.includes('<html')){
+      throw new Error('PRIVATE');
+    }
+    if(!buf.byteLength) throw new Error('EMPTY');
+
+    let name = target.name;
+    if(target.source === 'google' && !/\.(csv|xlsx)$/i.test(name)) name = 'Google Sheet.csv';
+    const file = new File([buf], name, { type: target.ext === 'csv' ? 'text/csv' : 'application/octet-stream' });
+
+    window.__fpPendingHandle = null;
+    window.__fpPendingUrl = raw;      // mémorisé pour l'historique
+    handleFile(file);
+    return true;
+  }catch(err){
+    fpLoadUI(false);
+    if(String(err.message) === 'PRIVATE'){
+      toast('Feuille privée — partage-la en « Tous les utilisateurs disposant du lien »');
+    } else if(String(err.message) === 'EMPTY'){
+      toast('Le lien ne renvoie aucune donnée');
+    } else if(err instanceof TypeError){
+      // Un échec CORS remonte comme TypeError, sans détail : le message doit
+      // couvrir les deux causes plausibles sans mentir sur laquelle.
+      toast('Lien inaccessible depuis le navigateur — vérifie le partage public du document');
+    } else {
+      toast('Échec du chargement : ' + err.message);
+    }
+    return false;
+  }
+}
+
+/** Petite fenêtre de saisie du lien. */
+function fpAskUrl(){
+  const existing = document.getElementById('fp-url-modal');
+  if(existing) existing.remove();
+  const ov = document.createElement('div');
+  ov.id = 'fp-url-modal';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:900;background:rgba(13,27,42,.55);display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = '<div style="background:var(--card);border-radius:18px;width:min(560px,96vw);overflow:hidden;box-shadow:0 28px 72px rgba(13,27,42,.28);font-family:\'DM Sans\',sans-serif">'
+    + '<div style="background:var(--navy);padding:15px 20px;font-weight:800;font-size:14px;color:#fff">Charger depuis un lien</div>'
+    + '<div style="padding:18px 20px">'
+    + '<label for="fp-url-input" style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Adresse du document</label>'
+    + '<input id="fp-url-input" type="url" spellcheck="false" placeholder="https://docs.google.com/spreadsheets/d/…"'
+    + ' style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12.5px;font-family:\'DM Mono\',monospace;outline:none;box-sizing:border-box;background:var(--card2);color:var(--dark)"/>'
+    + '<div style="font-size:11.5px;color:var(--mid);margin-top:10px;line-height:1.5">'
+    + 'Google Sheets, ou toute URL renvoyant un fichier <code>.csv</code> ou <code>.xlsx</code>.<br>'
+    + '<strong>Le document doit être partagé</strong> en « Tous les utilisateurs disposant du lien » : '
+    + 'le navigateur se connecte sans ton compte Google.'
+    + '</div></div>'
+    + '<div style="padding:14px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border)">'
+    + '<button class="btn" id="fp-url-cancel">Annuler</button>'
+    + '<button class="btn btn-primary" id="fp-url-go">Charger</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+
+  const close = () => ov.remove();
+  const go = async () => {
+    const v = document.getElementById('fp-url-input').value;
+    close();
+    await fpLoadFromUrl(v);
+  };
+  ov.addEventListener('click', e => { if(e.target === ov) close(); });
+  document.getElementById('fp-url-cancel').onclick = close;
+  document.getElementById('fp-url-go').onclick = go;
+  const input = document.getElementById('fp-url-input');
+  input.focus();
+  input.addEventListener('keydown', e => { if(e.key === 'Enter') go(); });
+}
+
 async function fpOpenFile(){
   if(window.showOpenFilePicker){
     try{
@@ -12359,7 +12508,9 @@ function fpRenderRecentFiles(){
       e.rows ? e.rows.toLocaleString('fr-FR') + ' lignes' : null,
       ago(e.date),
     ].filter(Boolean).join(' \u00b7 ');
-    const direct = e.hasHandle
+    const direct = e.url
+      ? '<span style="font-size:10px;color:var(--accent);white-space:nowrap">lien distant</span>'
+      : e.hasHandle
       ? '<span style="font-size:10px;color:var(--muted);white-space:nowrap">relecture directe</span>'
       : '<span style="font-size:10px;color:var(--muted);white-space:nowrap">a re-selectionner</span>';
     return '<button type="button" class="fp-recent-item" onclick="fpOpenRecent(' + i + ')"'
@@ -12381,6 +12532,13 @@ function fpRenderRecentFiles(){
 async function fpOpenRecent(idx){
   const entry = (typeof fpHistory === 'function' ? fpHistory() : [])[idx];
   if(!entry) return;
+  // Une URL se retélécharge : pas de permission à redemander, et les données
+  // sont fraîches par construction.
+  if(entry.url){
+    window.__fpPreferSheet = entry.sheet || null;
+    await fpLoadFromUrl(entry.url);
+    return;
+  }
   // La feuille memorisee evite de la redemander a chaque reouverture.
   window.__fpPreferSheet = entry.sheet || null;
   try { await fpHistoryOpen(idx); }
