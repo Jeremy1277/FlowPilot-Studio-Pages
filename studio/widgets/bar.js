@@ -25,18 +25,7 @@ const FP_PALETTE = [
  * Calcule un dégradé de couleur du plus clair au plus foncé
  * selon la valeur (plus haute = plus saturée)
  */
-function gradientColors(baseHex, count) {
-  const r = parseInt(baseHex.slice(1,3),16);
-  const g = parseInt(baseHex.slice(3,5),16);
-  const b = parseInt(baseHex.slice(5,7),16);
-  return Array.from({length: count}, (_,i) => {
-    const t = count === 1 ? 0.8 : 0.35 + (i / (count-1)) * 0.65;
-    const nr = Math.round(r + (255-r)*(1-t));
-    const ng = Math.round(g + (255-g)*(1-t));
-    const nb = Math.round(b + (255-b)*(1-t));
-    return `rgb(${nr},${ng},${nb})`;
-  });
-}
+
 
 /**
  * Calcule la droite de tendance (régression linéaire)
@@ -262,105 +251,9 @@ export function renderBar(w, elId, rawLabels, rawValues, chartInstances, fmtNum,
  * Panneau d'options de l'histogramme
  * Génère le HTML du panneau latéral "Modifier" pour ce widget
  */
-export function renderBarPanel(w, onChange) {
-  const variant   = w.barVariant  || 'vertical';
-  const colorMode = w.barColor    || 'mono';
-  const sort      = w.barSort     || 'desc';
-  const topN      = w.barTopN     || '';
-  const rounded   = w.barRounded  ?? 5;
-  const trend     = w.barTrend    || false;
-  const goal      = w.barGoal     ?? '';
-  const goalLbl   = w.barGoalLabel|| '';
-  const showVal   = w.showValues  !== false;
-  const color     = w.color       || '#4a7fa5';
 
-  const r = (name, val, label, cur) =>
-    '<label class="bp-radio"><input type="radio" name="'+name+'" value="'+val+'" '+(cur===val?'checked':'')+'/> '+label+'</label>';
-  const chk = (field, label, checked) =>
-    '<label class="bp-toggle"><input type="checkbox" data-field="'+field+'" '+(checked?'checked':'')+'/> '+label+'</label>';
-
-  return `
-<div class="bp-section">
-  <div class="bp-section-title">Forme</div>
-  <div class="bp-radio-group">
-    ${r('bp-variant','vertical','Vertical',variant)}
-    ${r('bp-variant','horizontal','Horizontal',variant)}
-    ${r('bp-variant','stacked','Empilé',variant)}
-  </div>
-</div>
-<div class="bp-section">
-  <div class="bp-section-title">Couleurs</div>
-  <div class="bp-radio-group">
-    ${r('bp-color','mono','Mono',colorMode)}
-    ${r('bp-color','palette','Palette',colorMode)}
-    ${r('bp-color','gradient','Dégradé',colorMode)}
-  </div>
-  <div class="bp-color-row" style="${colorMode!=='mono'?'opacity:.4;pointer-events:none':''}">
-    <label>Couleur</label>
-    <input type="color" id="bp-colorpicker" value="${color}"/>
-  </div>
-</div>
-<div class="bp-section">
-  <div class="bp-section-title">Tri & Top N</div>
-  <div class="bp-radio-group">
-    ${r('bp-sort','desc','↓ Grand→petit',sort)}
-    ${r('bp-sort','asc','↑ Petit→grand',sort)}
-    ${r('bp-sort','alpha','A→Z',sort)}
-    ${r('bp-sort','natural','Naturel',sort)}
-  </div>
-  <div class="bp-field-row" style="margin-top:6px">
-    <label>Afficher top</label>
-    <select id="bp-topn">
-      <option value="" ${!topN?'selected':''}>Tout</option>
-      <option value="5" ${topN==5?'selected':''}>Top 5</option>
-      <option value="10" ${topN==10?'selected':''}>Top 10</option>
-      <option value="20" ${topN==20?'selected':''}>Top 20</option>
-    </select>
-  </div>
-</div>
-<div class="bp-section">
-  <div class="bp-section-title">Apparence</div>
-  <div class="bp-field-row">
-    <label>Arrondi barres</label>
-    <div style="display:flex;align-items:center;gap:6px">
-      <input type="range" id="bp-rounded" min="0" max="16" value="${rounded}" style="flex:1"/>
-      <span id="bp-rounded-val" style="font-size:10px;color:var(--muted);width:26px">${rounded}px</span>
-    </div>
-  </div>
-  ${chk('showValues','Valeurs sur barres',showVal)}
-  ${chk('barTrend','Tendance',trend)}
-</div>
-<div class="bp-section">
-  <div class="bp-section-title">Objectif</div>
-  <div class="bp-field-row">
-    <label>Valeur cible</label>
-    <input type="number" id="bp-goal" value="${goal}" placeholder="ex: 100000"/>
-  </div>
-  <div class="bp-field-row">
-    <label>Label</label>
-    <input type="text" id="bp-goal-label" value="${goalLbl}" placeholder="Objectif"/>
-  </div>
-</div>`;
-}
 
 /**
  * Lit les valeurs du panneau et retourne un objet de mise à jour
  */
-export function readBarPanel(container) {
-  const get = (sel) => container.querySelector(sel);
-  const getVal = (sel) => { const el=get(sel); return el?el.value:null; };
-  const getChecked = (sel) => { const el=get(sel); return el?el.checked:false; };
 
-  return {
-    barVariant:   getVal('input[name="bp-variant"]:checked') || 'vertical',
-    barColor:     getVal('input[name="bp-color"]:checked')   || 'mono',
-    color:        getVal('#bp-colorpicker')                  || '#4a7fa5',
-    barSort:      getVal('input[name="bp-sort"]:checked')    || 'desc',
-    barTopN:      parseInt(getVal('#bp-topn'))||null,
-    barRounded:   parseInt(getVal('#bp-rounded'))||0,
-    barTrend:     getChecked('input[data-field="barTrend"]'),
-    showValues:   getChecked('input[data-field="showValues"]'),
-    barGoal:      parseFloat(getVal('#bp-goal'))||null,
-    barGoalLabel: getVal('#bp-goal-label')||''
-  };
-}

@@ -189,7 +189,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 .step-btn .ui-svg{width:14px;height:14px;flex-shrink:0}
 
 /* TOPBAR */
-#topbar{height:58px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;flex-shrink:0;position:relative}
+#topbar{height:58px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:14px;flex-shrink:0;position:relative;overflow:hidden;min-width:0}
 .brand{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .brand-logo{width:36px;height:36px;border-radius:10px;background:var(--accent);color:var(--navy);display:grid;place-items:center;font-family:'Barlow Condensed',sans-serif;font-weight:900;font-size:18px;box-shadow:0 6px 16px rgba(239,159,39,.35)}
 .brand-name{font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:21px;letter-spacing:-.03em;line-height:1}
@@ -201,7 +201,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 .step-btn.active{background:var(--accent);color:var(--navy)}
 .step-btn.done{color:var(--green)}
 .step-connector{width:20px;height:1px;background:var(--border)}
-.tb-actions{display:flex;gap:8px;align-items:center;margin-left:auto}
+.tb-actions{display:flex;gap:8px;align-items:center;margin-left:auto;
+  /* Elle déborde sinon dès l'iPad : le défilement horizontal vaut mieux
+     qu'une barre coupée hors écran. */
+  min-width:0;overflow-x:auto;scrollbar-width:none}
+.tb-actions::-webkit-scrollbar{display:none}
 .source-pill{font-size:11px;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:4px 12px;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
 .btn{border:1px solid var(--border);background:var(--card);color:var(--dark);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;font-family:'DM Sans',sans-serif}
 .btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -369,8 +373,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 #agent-fab:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(13,27,42,.3)}
 #agent-fab .af-orb{width:22px;height:22px;border-radius:99px;background:var(--accent);display:grid;place-items:center;font-size:12px;animation:orb-pulse 2.4s ease-in-out infinite}
 @keyframes orb-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,159,39,.5)}50%{box-shadow:0 0 0 7px rgba(239,159,39,0)}}
-#agent-panel{position:fixed;top:0;right:-460px;width:440px;max-width:92vw;height:100vh;background:var(--card);box-shadow:-12px 0 48px rgba(13,27,42,.2);z-index:350;display:flex;flex-direction:column;transition:right .3s cubic-bezier(.4,0,.2,1)}
-#agent-panel.open{right:0}
+#agent-panel{position:fixed;top:0;right:0;width:440px;max-width:92vw;height:100vh;background:var(--card);box-shadow:-12px 0 48px rgba(13,27,42,.2);z-index:350;display:flex;flex-direction:column;
+  /* Fermé = translaté hors écran. Un décalage en pixels (l'ancien -460px)
+     cesse d'être juste dès qu'une media query change la largeur. */
+  transform:translateX(calc(100% + 24px));visibility:hidden;
+  transition:transform .3s cubic-bezier(.4,0,.2,1),visibility 0s linear .3s}
+#agent-panel.open{transform:translateX(0);visibility:visible;transition:transform .3s cubic-bezier(.4,0,.2,1),visibility 0s}
 .agent-header{background:linear-gradient(135deg,var(--navy),#1e3a5a);padding:18px 20px;display:flex;align-items:center;gap:13px;flex-shrink:0}
 .agent-avatar{width:42px;height:42px;border-radius:12px;background:var(--accent);display:grid;place-items:center;font-size:22px;flex-shrink:0}
 .agent-title{color:#fff;font-weight:800;font-size:16px;line-height:1.1}
@@ -545,6 +553,80 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 .detect-btn-apply:hover{background:var(--accent2)}
 
 /* DATA QUALITY MODAL */
+/* Assistant de construction */
+#fp-assistant{display:none;position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:840;
+  align-items:center;justify-content:center}
+#fp-assistant.open{display:flex}
+.fpa-box{background:var(--card);border-radius:20px;width:min(940px,95vw);max-height:90vh;
+  display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 80px rgba(13,27,42,.32)}
+.fpa-head{background:var(--navy);padding:15px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.fpa-head-icon{width:30px;height:30px;border-radius:9px;background:var(--accent);color:#0d1b2a;
+  display:grid;place-items:center;font-size:14px;font-weight:800;flex-shrink:0}
+.fpa-head-title{font-weight:800;font-size:15px;color:#fff;font-family:'Barlow Condensed',sans-serif;
+  font-size:19px;letter-spacing:.01em}
+.fpa-head-sub{font-size:11px;color:rgba(255,255,255,.6)}
+.fpa-close{background:none;border:none;color:rgba(255,255,255,.6);font-size:19px;cursor:pointer;line-height:1}
+.fpa-body{display:flex;gap:0;flex:1;min-height:0}
+.fpa-main{flex:1;min-width:0;overflow-y:auto;padding:22px 24px}
+.fpa-side{width:210px;flex-shrink:0;border-left:1px solid var(--border);background:var(--card2);
+  padding:16px 14px;overflow-y:auto}
+.fpa-side-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--muted);margin-bottom:9px}
+.fpa-side-item{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;color:var(--dark);
+  padding:7px 8px;border-radius:9px;background:var(--card);border:1px solid var(--border);margin-bottom:6px}
+.fpa-side-empty{font-size:11px;color:var(--muted);line-height:1.45}
+.fpa-question{font-size:19px;font-weight:800;color:var(--navy);margin-bottom:14px;
+  font-family:'Barlow Condensed',sans-serif;letter-spacing:-.01em}
+.fpa-options{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:9px}
+.fpa-opt{text-align:left;border:1px solid var(--border);background:var(--card);border-radius:12px;
+  padding:11px 13px;cursor:pointer;font-family:inherit;transition:border-color .12s,background .12s}
+.fpa-opt:hover{border-color:var(--accent);background:var(--accent-soft)}
+.fpa-opt-label{font-size:13px;font-weight:700;color:var(--dark);display:block;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fpa-opt-hint{font-size:10.5px;color:var(--mid);display:block;margin-top:2px;line-height:1.35}
+.fpa-search{width:100%;font-size:12px;padding:8px 11px;border:1px solid var(--border);
+  border-radius:10px;font-family:inherit;margin-bottom:10px}
+.fpa-more{background:none;border:none;color:var(--mid);font-size:11.5px;cursor:pointer;
+  text-decoration:underline;padding:8px 0 0;font-family:inherit}
+.fpa-verdict{background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;
+  padding:13px 15px;margin-bottom:14px}
+.fpa-verdict-type{font-size:15px;font-weight:800;color:var(--navy);margin-bottom:3px}
+.fpa-verdict-why{font-size:12px;color:var(--mid);line-height:1.5}
+.fpa-preview-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--muted);margin-bottom:7px}
+.fpa-preview{height:260px;border:1px solid var(--border);border-radius:12px;background:var(--card);
+  padding:12px;overflow:hidden}
+.fpa-alts{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.fpa-alt{border:1px solid var(--border);background:var(--card);border-radius:99px;padding:6px 12px;
+  font-size:11.5px;cursor:pointer;font-family:inherit;color:var(--mid)}
+.fpa-alt:hover{border-color:var(--accent);color:var(--navy)}
+.fpa-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:10px;
+  align-items:center;flex-shrink:0;background:var(--card)}
+@media (max-width:760px){ .fpa-side{display:none} .fpa-preview{height:200px} }
+/* Drill-down : fil d'Ariane dans l'entête du widget */
+.fp-drill-bar{display:flex;align-items:center;gap:3px;flex-wrap:wrap;margin-top:3px;font-size:10px}
+.fp-dc{background:none;border:none;padding:1px 4px;border-radius:5px;font:inherit;font-size:10px;
+  color:var(--mid);cursor:pointer;font-family:'DM Sans',sans-serif;max-width:150px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.fp-dc:hover{background:var(--accent-soft);color:var(--navy)}
+.fp-dc-cur{color:var(--navy);font-weight:800;cursor:default}
+.fp-dc-cur:hover{background:none}
+.fp-dc-sep{color:var(--muted);font-size:10px}
+.fp-dc-rows{margin-left:4px;border:1px solid var(--border);color:var(--mid)}
+/* Modale « voir les lignes » */
+#drill-rows-modal{display:none;position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:820;
+  align-items:center;justify-content:center}
+#drill-rows-modal .drm-box{background:var(--card);border-radius:16px;width:min(1000px,95vw);
+  max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 28px 72px rgba(13,27,42,.28)}
+#drill-rows-modal .drm-head{background:var(--navy);padding:13px 18px;display:flex;align-items:center;gap:12px}
+#drill-rows-modal .drm-body{overflow:auto;padding:0}
+#drill-rows-modal table{width:100%;border-collapse:collapse;font-size:11.5px}
+#drill-rows-modal th{position:sticky;top:0;background:var(--card2);text-align:left;padding:7px 10px;
+  border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);font-weight:800;white-space:nowrap}
+#drill-rows-modal td{padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;
+  max-width:220px;overflow:hidden;text-overflow:ellipsis}
+#drill-rows-modal tbody tr:hover{background:var(--card2)}
 #quality-modal{display:none;position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:250;align-items:center;justify-content:center}
 #quality-modal.open{display:flex}
 .quality-box{background:var(--card);border-radius:20px;width:30vw;min-width:420px;max-width:680px;max-height:88vh;overflow-y:auto;box-shadow:0 28px 72px rgba(13,27,42,.30)}
@@ -858,6 +940,43 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
   /* Modals */
   #modal-box { width: calc(100vw - 24px) !important; max-width: none !important; margin: 12px; }
   #datefmt-box { width: calc(100vw - 24px) !important; max-width: none !important; }
+}
+
+/* Sur tablette portrait, la barre supérieure déborde encore : on retire la
+   navigation d'étapes (le fil d'étapes reste accessible par les boutons). */
+@media (max-width:920px){
+  .steps-nav{display:none}
+  #source-pill{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #topbar{padding:0 12px;gap:8px}
+}
+
+/* ── COUCHE TACTILE ──────────────────────────────────────────────────────
+   S'applique aux appareils sans souris (iPhone, iPad, écrans tactiles), et
+   à eux seuls : le poste de travail n'est pas affecté. 44 px est le seuil
+   au-dessous duquel une cible devient difficile à viser au doigt. */
+@media (pointer:coarse){
+  .steps-nav button, .tb-actions button, .tb-actions a,
+  #fp-settings-btn, #agent-fab, .wc-btn, .btn, .qf-btn-continue,
+  .filter-pill, .fp-dc, .fpa-opt, .fpa-alt, summary{
+    min-height:44px;
+  }
+  .wc-btn, .fp-dc{ padding-top:8px; padding-bottom:8px; }
+  #fp-settings-btn{ min-width:44px; }
+  #agent-fab{ min-width:44px; }
+  /* Les champs de saisie et listes déroulantes doivent rester confortables :
+     en dessous de 16 px, iOS zoome automatiquement à la mise au point. */
+  .fp-gf-select, .fp-gf-date, .fp-gf-period-btn, .fp-gf-btn,
+  .pf-filter-select, .pf-date-input,
+  input[type="date"], input[type="text"], input[type="number"], select, textarea{
+    min-height:44px; font-size:16px;
+  }
+  /* Un bouton haut de 44 px mais large de 22 reste impossible à viser :
+     les icônes des cartes ont besoin des deux dimensions. */
+  .wc-btn, .wc-btn.del, .zoom-btn, .fp-cf-chip-x{ min-width:40px; justify-content:center; }
+  .fp55-drag-btn{ min-width:40px; }
+  /* Aucun libellé sous 11 px sur un écran tenu à bout de bras. */
+  .mob-tab .mt-label{ font-size:10.5px; }
+  .filter-pill{ font-size:12px; }
 }
 
 /* ── Widget AI Chat Box ── */
@@ -1206,11 +1325,11 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
         <!-- TEMPLATES -->
         <div class="template-section" style="margin-bottom:28px">
           <div class="template-grid" style="grid-template-columns:repeat(2,minmax(300px,1fr));max-width:800px;margin:0 auto">
-            <button class="tpl-btn" onclick="fpAutoTemplate()">
+            <button class="tpl-btn" onclick="fpOpenAssistant()">
               <div class="tpl-icon-badge tpl-auto"><svg class="ui-svg"><use href="#i-flash"></use></svg></div>
-              <div class="tpl-name">Analyse automatique</div>
-              <div class="tpl-desc">FlowPilot analyse vos colonnes et propose les meilleurs visuels</div>
-              <div class="tpl-badge" style="background:var(--accent-soft);color:var(--accent)">IA</div>
+              <div class="tpl-name">Construire avec l'assistant</div>
+              <div class="tpl-desc">Trois questions, et FlowPilot choisit le bon visuel pour vous — avec l'aperçu de vos données à chaque étape</div>
+              <div class="tpl-badge" style="background:var(--green-soft,#e6f5ef);color:var(--green,#1D9E75)">100 % local</div>
             </button>
             <button class="tpl-btn" onclick="fpMonTableauDeBord()">
               <div class="tpl-icon-badge tpl-perso"><svg class="ui-svg"><use href="#i-layout"></use></svg></div>
@@ -1254,12 +1373,76 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
       </div>
     </div>
 
+    <!-- Assistant de construction (100 % local) ────────────────────────── -->
+    <div id="fp-assistant" role="dialog" aria-modal="true" aria-labelledby="fpa-question">
+      <div class="fpa-box">
+        <div class="fpa-head">
+          <div class="fpa-head-icon">◆</div>
+          <div style="flex:1;min-width:0">
+            <div class="fpa-head-title">Construisons votre tableau de bord</div>
+            <div class="fpa-head-sub" id="fpa-progress"></div>
+          </div>
+          <button type="button" class="fpa-close" onclick="fpCloseAssistant()" aria-label="Fermer">&#10005;</button>
+        </div>
+
+        <div class="fpa-body">
+          <div class="fpa-main">
+            <div id="fpa-step">
+              <div class="fpa-question" id="fpa-question"></div>
+              <div class="fpa-search-wrap" id="fpa-search-wrap" style="display:none">
+                <input type="text" id="fpa-search" class="fpa-search" placeholder="Rechercher une colonne…" oninput="fpAssistFilter(this.value)"/>
+              </div>
+              <div class="fpa-options" id="fpa-options"></div>
+              <button type="button" class="fpa-more" id="fpa-more" style="display:none" onclick="fpAssistShowAll()">Voir toutes les colonnes</button>
+            </div>
+
+            <div id="fpa-result" style="display:none">
+              <div class="fpa-verdict" id="fpa-verdict"></div>
+              <div class="fpa-preview-wrap">
+                <div class="fpa-preview-label">Aperçu avec vos données</div>
+                <div class="fpa-preview" id="fpa-preview"></div>
+              </div>
+              <div class="fpa-alts" id="fpa-alts"></div>
+            </div>
+          </div>
+
+          <aside class="fpa-side">
+            <div class="fpa-side-title">Votre tableau de bord</div>
+            <div class="fpa-side-list" id="fpa-added"></div>
+          </aside>
+        </div>
+
+        <div class="fpa-foot">
+          <button type="button" class="btn" id="fpa-back" onclick="fpAssistBack()">← Retour</button>
+          <div style="flex:1"></div>
+          <button type="button" class="btn" onclick="fpAssistFinish()" id="fpa-finish">Terminer</button>
+          <button type="button" class="btn btn-primary" id="fpa-add" style="display:none" onclick="fpAssistAdd()">+ Ajouter ce visuel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal « voir les lignes » (drill-through) ──────────────────────── -->
+    <div id="drill-rows-modal" role="dialog" aria-modal="true" aria-labelledby="drill-rows-title">
+      <div class="drm-box">
+        <div class="drm-head">
+          <span style="font-size:15px">&#8801;</span>
+          <div style="flex:1;min-width:0">
+            <div id="drill-rows-title" style="font-weight:800;font-size:13px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Détail</div>
+            <div id="drill-rows-count" style="font-size:10.5px;color:rgba(255,255,255,.65)"></div>
+          </div>
+          <button type="button" class="btn" onclick="fpDrillRowsCsv()" style="padding:5px 10px;font-size:11px">&#8615; CSV</button>
+          <button type="button" onclick="fpCloseDrillRows()" aria-label="Fermer" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:19px;cursor:pointer;line-height:1">&#10005;</button>
+        </div>
+        <div class="drm-body"><table id="drill-rows-table"></table></div>
+      </div>
+    </div>
+
     <!-- Modal Colonne Calculée ─────────────────────────────────────────── -->
     <div id="calc-col-modal" style="display:none;position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:800;align-items:center;justify-content:center">
       <div style="background:var(--card);border-radius:18px;width:min(520px,95vw);box-shadow:0 28px 72px rgba(13,27,42,.28);overflow:hidden;font-family:'DM Sans',sans-serif">
         <div style="background:var(--navy);padding:16px 20px;display:flex;align-items:center;gap:10px">
           <span style="font-size:16px">✨</span>
-          <span style="font-weight:800;font-size:14px;color:#fff">Colonne calculée par IA</span>
+          <span style="font-weight:800;font-size:14px;color:#fff">Nouvelle colonne calculée</span>
           <button onclick="closeCalcColModal()" style="margin-left:auto;background:none;border:none;color:rgba(255,255,255,.6);font-size:20px;cursor:pointer;line-height:1">✕</button>
         </div>
         <div style="padding:20px">
@@ -1282,24 +1465,19 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
           <!-- Mode manuel : écrire/coller la formule sans IA -->
           <button type="button" id="calc-col-manual-toggle" onclick="calcColToggleManual()" style="background:none;border:none;color:var(--mid);font-size:11px;cursor:pointer;padding:0;margin-top:10px;text-decoration:underline;font-family:inherit">✍️ Écrire la formule moi-même (sans IA)</button>
           <div id="calc-col-manual" style="display:none;margin-top:10px">
-            <textarea id="calc-col-manual-input" rows="3" spellcheck="false" placeholder='r => String(r["MA COLONNE"]||"").toUpperCase()'
+            <textarea id="calc-col-manual-input" rows="3" spellcheck="false" placeholder="[CA] / [Distance KM]"
               style="width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:11px;font-family:'DM Mono',monospace;resize:vertical;outline:none;box-sizing:border-box;background:var(--card2);color:var(--dark)"></textarea>
-            <div style="font-size:10px;color:var(--muted);margin-top:5px">Fonction JavaScript : <code>r</code> est la ligne, <code>r["Colonne"]</code> une valeur. <code>parseDateValue(v)</code> dispo pour les dates.</div>
-            <button class="btn" type="button" onclick="calcColTestManual()" style="margin-top:8px">▶ Tester la formule</button>
-          </div>
-          <!-- Clé OpenAI manquante : saisie directement ici -->
-          <div id="calc-col-key" style="display:none;margin-top:12px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;padding:12px">
-            <div style="font-size:12px;font-weight:800;margin-bottom:4px">🔑 Connexion IA requise</div>
-            <div style="font-size:11px;color:var(--mid);margin-bottom:8px">Renseigne ta clé OpenAI (sk-…) ou Claude/Anthropic (sk-ant-…) — stockée uniquement dans ton navigateur, utilisée aussi par l'Agent Analyste.</div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input id="calc-col-key-input" type="password" placeholder="sk-..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none"/>
-              <button class="btn btn-primary" type="button" onclick="calcColSaveKey()">Enregistrer</button>
+            <div style="font-size:10px;color:var(--muted);margin-top:5px">Une colonne s'écrit entre crochets : <code>[CA]</code>. Opérateurs <code>+ - * /</code>, comparaisons, <code>&amp;</code> pour concaténer. Ex. <code>IF([Marge] &gt; 0, "OK", "Perte")</code></div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+              <button class="btn" type="button" onclick="calcColTestManual()">▶ Tester la formule</button>
+              <button type="button" onclick="fpToggleFormulaHelp()" style="background:none;border:none;color:var(--mid);font-size:11px;cursor:pointer;padding:0;text-decoration:underline;font-family:inherit">📖 Fonctions disponibles</button>
             </div>
+            <div id="calc-col-fnhelp" style="display:none;margin-top:8px;max-height:200px;overflow:auto;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px"></div>
           </div>
+          
         </div>
         <div style="padding:0 20px 20px;display:flex;gap:10px;justify-content:flex-end">
           <button class="btn" onclick="closeCalcColModal()">Annuler</button>
-          <button class="btn" id="calc-col-gen-btn" onclick="calcColGenerate()" style="background:var(--navy);color:#fff">✨ Générer la formule</button>
           <button class="btn btn-primary" id="calc-col-apply-btn" onclick="calcColApply()" style="display:none">✓ Ajouter la colonne</button>
         </div>
       </div>
@@ -1453,15 +1631,12 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
     <div class="detect-head">
       <div class="detect-head-icon">✨</div>
       <div style="flex:1">
-        <div class="detect-head-title">Assistant IA — FlowPilot Studio</div>
+        <div class="detect-head-title">FlowPilot Studio</div>
         <div class="detect-head-sub" id="detect-head-sub">Analyse en cours…</div>
       </div>
     </div>
     <div class="ai-chat-feed" id="ai-chat-feed"></div>
-    <div class="ai-chat-input-zone">
-      <textarea id="ai-chat-textarea" rows="1" placeholder="Décrivez ce que vous souhaitez visualiser…" oninput="aiChatResize(this)" onkeydown="aiChatKeydown(event)"></textarea>
-      <button class="ai-chat-send" id="ai-chat-send" onclick="aiChatSend()" title="Envoyer">&#10148;</button>
-    </div>
+
     <div class="ai-chat-footer">
       <button class="ai-chat-footer-skip" onclick="skipDetect()">Passer — configurer manuellement</button>
       <button class="ai-apply-btn" id="ai-apply-btn" onclick="aiApplyWidgets()">✓ Générer le dashboard</button>
@@ -1707,15 +1882,14 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
     <div class="agent-avatar">🧠</div>
     <div style="flex:1">
       <div class="agent-title">Agent Analyste</div>
-      <div class="agent-status" id="agent-status-line"><span class="as-dot"></span>Analyse locale · aucune donnée envoyée</div>
+      <div class="agent-status" id="agent-status-line"><span class="as-dot"></span>Analyse locale</div>
     </div>
     <button class="agent-close" onclick="closeAgent()">✕</button>
   </div>
   <div class="agent-feed" id="agent-feed"></div>
   <div class="agent-quick" id="agent-quick"></div>
-  <div class="agent-input-zone">
-    <textarea id="agent-textarea" rows="1" placeholder="Posez une question à l'IA… (ex: pourquoi mes ventes baissent ?)" oninput="agentTextareaResize(this)" onkeydown="agentInputKeydown(event)"></textarea>
-    <button class="agent-send-btn" id="agent-send-btn" onclick="agentSendToOpenAI()" title="Envoyer à GPT-4o-mini">&#10148;</button>
+  <div class="agent-input-zone" style="display:block;font-size:11px;color:var(--muted);line-height:1.45">
+    Analyse effectuée sur votre poste. Aucune donnée n'est envoyée.
   </div>
 </div>
 
@@ -1770,16 +1944,6 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
     setTimeout(function(){ scr.classList.add('intro-stage3'); },7000);
     setTimeout(closeIntro,14000);
   }
-})();
-
-// ── OPENAI KEY INIT ──────────────────────────────────────────────────────
-// Chargement de la clé depuis config.js (fichier séparé, non versionné)
-(function(){
-  if(localStorage.getItem('flowpilot_openai_key')) return;
-  fetch('./config.js').then(r=>r.text()).then(t=>{
-    const m=t.match(/OPENAI_KEY\s*=\s*['"]([^'"]+)['"]/);
-    if(m&&m[1].startsWith('sk-')) localStorage.setItem('flowpilot_openai_key',m[1]);
-  }).catch(()=>{});
 })();
 
 // ── STATE ────────────────────────────────────────────────────────────────
@@ -2017,11 +2181,75 @@ function chartPerfOptions(extraPlugins={}){
 // ── UTILS ────────────────────────────────────────────────────────────────
 const uid=()=>Math.random().toString(36).slice(2,8);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Les couleurs proviennent des widgets, donc potentiellement d'un .fpstudio reçu
+// d'un tiers. On n'accepte que des formes closes avant injection dans du CSS/SVG.
+const RE_SAFE_COLOR=/^(#[0-9a-fA-F]{3,8}|rgba?\(\s*[\d.\s,%]+\)|hsla?\(\s*[\d.\s,%deg]+\)|[a-zA-Z]{3,20})$/;
+const safeColor=(c,fallback)=>{const s=String(c??'').trim();return RE_SAFE_COLOR.test(s)?s:(fallback||'#EF9F27');};
 const colLabel=name=>colAliases[name]||name;
+
+// XLSX.js rend les cellules date avec une dérive constante de quelques
+// secondes (mesuré : −21 s), donc « 01/01/2024 » arrive en
+// « 31/12/2023 23:59:39 ». Hors UTC, tous les regroupements par mois,
+// trimestre et année sont alors faux aux bornes. On arrondit à la minute :
+// la dérive disparaît, une vraie heure métier (08:30) reste intacte.
+// Clé canonique et libellé court d'une période. Définis ici et INJECTÉS dans
+// le HTML exporté via String(fn) : une seule définition pour l'app et pour
+// l'export, au lieu de deux copies qui divergent (c'est ce qui produisait
+// « janvier 2024 » d'un côté et « Jan 2024 » de l'autre).
+const FP_MONTHS_SHORT=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+function fpPeriodKey(d, grain){
+  if(!(d instanceof Date) || isNaN(d)) return '';
+  const y=d.getFullYear(), mo=d.getMonth()+1;
+  if(grain==='year')    return String(y);
+  if(grain==='quarter') return y+'-Q'+Math.ceil(mo/3);
+  if(grain==='day')     return y+'-'+String(mo).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  if(grain==='week'){
+    // Semaine ISO 8601 : jeudi de la semaine courante, année du jeudi.
+    const t=new Date(Date.UTC(y,d.getMonth(),d.getDate()));
+    t.setUTCDate(t.getUTCDate()+4-(t.getUTCDay()||7));
+    const yr=t.getUTCFullYear();
+    const wk=Math.ceil(((t-new Date(Date.UTC(yr,0,1)))/86400000+1)/7);
+    return yr+'-W'+String(wk).padStart(2,'0');
+  }
+  return y+'-'+String(mo).padStart(2,'0');
+}
+function fpPeriodLabel(key, grain){
+  const k=String(key||'');
+  if(grain==='month'){ const p=k.split('-'); return p.length>1?(FP_MONTHS_SHORT[parseInt(p[1],10)-1]+' '+p[0]):k; }
+  if(grain==='quarter'){ const p=k.split('-Q'); return p.length>1?('T'+p[1]+' '+p[0]):k; }
+  if(grain==='week'){ const p=k.split('-W'); return p.length>1?('S'+p[1]+' '+p[0]):k; }
+  if(grain==='day'){ const p=k.split('-'); return p.length>2?(parseInt(p[2],10)+' '+FP_MONTHS_SHORT[parseInt(p[1],10)-1]+' '+p[0]):k; }
+  return k;
+}
+const FP_MINUTE_MS = 60000;
+// Source injectée telle quelle dans l'export (voir buildExportHTML).
+const FP_MINUTE_MS_SRC = 'const FP_MINUTE_MS = 60000;';
+const FP_MONTHS_SHORT_SRC = "const FP_MONTHS_SHORT=['Jan','F\u00e9v','Mar','Avr','Mai','Jun','Jul','Ao\u00fb','Sep','Oct','Nov','D\u00e9c'];";
+function fpNormalizeDate(d){
+  if(!(d instanceof Date) || isNaN(d)) return d;
+  const t = d.getTime();
+  const r = Math.round(t / FP_MINUTE_MS) * FP_MINUTE_MS;
+  return r === t ? d : new Date(r);
+}
+// Applique la normalisation à toutes les cellules Date d'un jeu de lignes.
+function fpNormalizeRowDates(list){
+  if(!Array.isArray(list) || !list.length) return list;
+  const keys = Object.keys(list[0] || {});
+  const dateKeys = keys.filter(k => list.some(r => r && r[k] instanceof Date));
+  if(!dateKeys.length) return list;
+  for(let i=0;i<list.length;i++){
+    const r=list[i]; if(!r) continue;
+    for(let j=0;j<dateKeys.length;j++){
+      const k=dateKeys[j];
+      if(r[k] instanceof Date) r[k]=fpNormalizeDate(r[k]);
+    }
+  }
+  return list;
+}
 
 function parseDateValue(v){
   if(v===null||v===undefined||v==='') return null;
-  if(v instanceof Date && !isNaN(v)) return v;
+  if(v instanceof Date && !isNaN(v)) return fpNormalizeDate(v);
   if(typeof v==='number' && Number.isFinite(v)){
     if(v>=20000 && v<=80000){
       const d=new Date(Math.round((v-25569)*86400*1000));
@@ -2211,47 +2439,583 @@ function groupByDim(dimCol, valCol, aggr, limit=10, sortMode){
   });
 }
 
+// ── ASSISTANT DE CONSTRUCTION (100 % local) ─────────────────────────────
+// Remplace « Analyse automatique ». Trois questions en QCM, une recommandation
+// motivée, et l'aperçu réel avant d'ajouter. Aucune requête réseau : le moteur
+// de règles vit dans widgets/recommend.js et ne voit que la structure du
+// fichier, jamais un service tiers.
+let fpAssist=null;
+
+function fpOpenAssistant(){
+  if(!rows.length){ toast('⚠ Chargez un fichier de données d\'abord'); return; }
+  if(typeof window.FP_buildFlow!=='function'){
+    toast('Le moteur de recommandation charge encore, réessayez dans un instant'); return;
+  }
+  const stats=window.FP_computeColumnStats(rows, columns);
+  stats.periodPresets=FP_PERIOD_PRESETS.filter(p=>p.id!=='custom');
+  fpAssist={
+    stats,
+    flow:window.FP_buildFlow(columns, fieldModels, stats),
+    step:0, answers:{}, added:[], showAll:false, filter:'',
+    rec:null, previewWidget:null, chosenType:null
+  };
+  document.getElementById('fp-assistant').classList.add('open');
+  fpAssistRender();
+}
+
+function fpCloseAssistant(){
+  document.getElementById('fp-assistant').classList.remove('open');
+  fpAssistDestroyPreview();
+  fpAssist=null;
+}
+
+function fpAssistDestroyPreview(){
+  if(fpAssist&&fpAssist.previewWidget) destroyChart('chart-'+fpAssist.previewWidget.id);
+}
+
+// Rend l'étape courante, ou le verdict quand les trois réponses sont là.
+function fpAssistRender(){
+  if(!fpAssist) return;
+  const a=fpAssist;
+  const stepEl=document.getElementById('fpa-step');
+  const resEl=document.getElementById('fpa-result');
+  const addBtn=document.getElementById('fpa-add');
+  const backBtn=document.getElementById('fpa-back');
+
+  fpAssistRenderSide();
+
+  if(a.step>=a.flow.length){
+    stepEl.style.display='none'; resEl.style.display='';
+    addBtn.style.display=''; backBtn.style.display='';
+    document.getElementById('fpa-progress').textContent='Voici ce que je vous propose';
+    fpAssistRenderResult();
+    return;
+  }
+
+  stepEl.style.display=''; resEl.style.display='none'; addBtn.style.display='none';
+  backBtn.style.display=a.step>0?'':'none';
+  fpAssistDestroyPreview();
+
+  const q=a.flow[a.step];
+  document.getElementById('fpa-progress').textContent='Question '+(a.step+1)+' sur '+a.flow.length;
+  document.getElementById('fpa-question').textContent=q.question;
+
+  const searchWrap=document.getElementById('fpa-search-wrap');
+  searchWrap.style.display=q.allowSearch?'':'none';
+  if(!q.allowSearch) a.filter='';
+
+  const all=q.allOptions||q.options||[];
+  const top=q.topOptions||q.options||[];
+  let list=(a.showAll||a.filter)?all:top;
+  if(a.filter){
+    const f=a.filter.toLowerCase();
+    list=all.filter(o=>String(o.label).toLowerCase().includes(f));
+  }
+
+  document.getElementById('fpa-options').innerHTML=list.map((o,i)=>
+    '<button type="button" class="fpa-opt" data-i="'+i+'" onclick="fpAssistPick('+i+')">'
+    +'<span class="fpa-opt-label">'+esc(o.label)+'</span>'
+    +(o.hint?'<span class="fpa-opt-hint">'+esc(o.hint)+'</span>':'')
+    +'</button>').join('') || '<div class="fpa-side-empty">Aucune colonne ne correspond.</div>';
+  a._visible=list;
+
+  const more=document.getElementById('fpa-more');
+  const hidden=all.length-top.length;
+  more.style.display=(!a.showAll&&!a.filter&&hidden>0)?'':'none';
+  more.textContent='Voir les '+all.length+' colonnes ('+hidden+' de plus)';
+}
+
+function fpAssistFilter(v){ if(!fpAssist) return; fpAssist.filter=v||''; fpAssistRender(); }
+function fpAssistShowAll(){ if(!fpAssist) return; fpAssist.showAll=true; fpAssistRender(); }
+
+function fpAssistPick(i){
+  if(!fpAssist) return;
+  const opt=fpAssist._visible[i]; if(!opt) return;
+  fpAssist.answers[fpAssist.flow[fpAssist.step].id]=opt;
+  fpAssist.step++; fpAssist.showAll=false; fpAssist.filter='';
+  const si=document.getElementById('fpa-search'); if(si) si.value='';
+  fpAssist.chosenType=null;
+  fpAssistRender();
+}
+
+function fpAssistBack(){
+  if(!fpAssist) return;
+  fpAssistDestroyPreview();
+  fpAssist.step=Math.max(0, fpAssist.step-1);
+  fpAssist.chosenType=null;
+  fpAssistRender();
+}
+
+// Construit la spécification attendue par le moteur à partir des réponses.
+function fpAssistSpec(){
+  const a=fpAssist.answers;
+  const m=(a.measure&&a.measure.meta)||{}, d=(a.dimension&&a.dimension.meta)||{}, p=(a.period&&a.period.meta)||{};
+  // Le moteur parle métier (« 12 transporteurs ») s'il reçoit le type métier
+  // et les libellés — sans eux il retombe sur « 12 valeurs différentes de… ».
+  const fmOf=n=>(n&&fieldModels&&fieldModels[n])||{};
+  return {
+    measure:m.column||null,
+    measureLabel:m.column?colLabel(m.column):(a.measure&&a.measure.label)||'Nombre de lignes',
+    aggregation:m.aggregation||'sum',
+    countColumn:m.countColumn||null,
+    dimension:d.column||null,
+    dimensionLabel:d.column?colLabel(d.column):'',
+    dimensionBusinessType:fmOf(d.column).businessType||'',
+    dimensionKind:d.kind||null,
+    cardinality:d.cardinality||0,
+    grain:d.grain||null,
+    periodPreset:(p.preset)||(a.period&&a.period.value)||'all'
+  };
+}
+
+function fpAssistRenderResult(){
+  const a=fpAssist;
+  const spec=fpAssistSpec();
+  const rec=window.FP_recommendWidget(spec);
+  a.rec=rec;
+
+  const CT=id=>(CHART_TYPES.find(c=>c.id===id)||{label:id});
+  const shown=a.chosenType||rec.type;
+  const conf=(shown===rec.type)?rec:(rec.alternatives||[]).find(x=>x.type===shown)||rec;
+
+  document.getElementById('fpa-verdict').innerHTML=
+    '<div class="fpa-verdict-type">'+esc(CT(shown).label)+'</div>'
+    +'<div class="fpa-verdict-why">'+esc(conf.reason||rec.reason||'')+'</div>';
+
+  // Aperçu : un vrai widget, rendu avec les vraies données.
+  fpAssistDestroyPreview();
+  const cfg=Object.assign({}, (shown===rec.type?rec.config:(conf.config||rec.config))||{}, {type:shown});
+  const w=Object.assign({id:'fpa-prev-'+Date.now().toString(36), widthCols:12, height:230}, cfg);
+  if(spec.periodPreset&&spec.periodPreset!=='all'){
+    w.period={preset:spec.periodPreset, col:null, from:'', to:''};
+  }
+  a.previewWidget=w;
+  if(rec.dateGrain&&w.col) colDateFormats[w.col]=rec.dateGrain;
+  clearAggregationCache();
+  try{ renderWidgetBody(w,'fpa-preview',false); }
+  catch(e){ document.getElementById('fpa-preview').innerHTML='<div class="fpa-side-empty">Aperçu indisponible pour ce visuel.</div>'; }
+
+  const alts=(rec.alternatives||[]).concat(shown!==rec.type?[{type:rec.type,reason:rec.reason}]:[])
+    .filter(x=>x.type!==shown);
+  document.getElementById('fpa-alts').innerHTML=alts.length
+    ? '<span style="font-size:11px;color:var(--muted)">Plutôt&nbsp;:</span>'
+      +alts.map(x=>'<button type="button" class="fpa-alt" title="'+esc(x.reason||'')+'" onclick="fpAssistSwitch(\''+x.type+'\')">'+esc(CT(x.type).label)+'</button>').join('')
+    : '';
+}
+
+function fpAssistSwitch(type){ if(!fpAssist) return; fpAssist.chosenType=type; fpAssistRenderResult(); }
+
+function fpAssistAdd(){
+  if(!fpAssist||!fpAssist.previewWidget) return;
+  const src=fpAssist.previewWidget;
+  const w=Object.assign({}, src, {id:'w'+Date.now().toString(36)+Math.floor(performance.now()%1000)});
+  delete w.__keyByLabel;
+  w.widthCols=undefined; w.height=undefined;
+  Object.keys(w).forEach(k=>{ if(w[k]===undefined) delete w[k]; });
+  widgets.push(w);
+  fpAssist.added.push({type:w.type, title:getWidgetTitle(w)});
+  fpAssistDestroyPreview();
+  fpAssist.step=0; fpAssist.answers={}; fpAssist.chosenType=null;
+  fpAssist.previewWidget=null;
+  clearAggregationCache();
+  fpAssistRender();
+  toast('✓ Visuel ajouté — ' + fpAssist.added.length + ' au total');
+}
+
+function fpAssistRenderSide(){
+  const el=document.getElementById('fpa-added');
+  if(!el||!fpAssist) return;
+  const total=widgets.length;
+  el.innerHTML=total
+    ? widgets.map(w=>{
+        const ct=CHART_TYPES.find(c=>c.id===w.type);
+        return '<div class="fpa-side-item"><span>'+esc((ct&&ct.icon)||'▪')+'</span><span style="flex:1;min-width:0">'+esc(getWidgetTitle(w)||(ct?ct.label:w.type))+'</span></div>';
+      }).join('')
+    : '<div class="fpa-side-empty">Rien encore. Répondez aux trois questions et je vous propose un visuel.</div>';
+}
+
+function fpAssistFinish(){
+  const n=widgets.length;
+  fpCloseAssistant();
+  clearAggregationCache();
+  if(n){ goStep(3); toast('✓ '+n+' visuel'+(n>1?'s':'')+' — à vous de les agencer'); }
+  else { goStep(3); }
+}
+
+window.fpOpenAssistant=fpOpenAssistant; window.fpCloseAssistant=fpCloseAssistant;
+window.fpAssistPick=fpAssistPick; window.fpAssistBack=fpAssistBack;
+window.fpAssistAdd=fpAssistAdd; window.fpAssistSwitch=fpAssistSwitch;
+window.fpAssistFilter=fpAssistFilter; window.fpAssistShowAll=fpAssistShowAll;
+window.fpAssistFinish=fpAssistFinish;
+
+// ── PORTÉE TEMPORELLE PAR WIDGET ────────────────────────────────────────
+// Le filtre de période existant est GLOBAL et n'est pas sauvegardé dans le
+// projet. Impossible d'avoir « le CA du mois en cours » à côté de
+// « l'évolution depuis janvier ». Chaque widget porte donc sa propre portée,
+// exprimée en presets de gestion plutôt qu'en dates absolues.
+// Date de référence des presets. Gelée pendant la génération d'un export :
+// un dashboard exporté en juin ne doit pas changer de contenu en août.
+let _fpFrozenToday=null;
+function fpToday(){ return _fpFrozenToday||new Date(); }
+
+const FP_PERIOD_PRESETS=[
+  {id:'all',        label:'Tout l\'historique',        short:'Tout'},
+  {id:'this_month', label:'Ce mois-ci',                 short:'Ce mois'},
+  {id:'last_month', label:'Le mois dernier',            short:'Mois dernier'},
+  {id:'last_12m',   label:'Les 12 derniers mois',       short:'12 derniers mois'},
+  {id:'ytd',        label:'Depuis le 1er janvier',      short:'Depuis janvier'},
+  {id:'this_quarter',label:'Ce trimestre',              short:'Ce trimestre'},
+  {id:'last_quarter',label:'Le trimestre dernier',      short:'Trimestre dernier'},
+  {id:'this_year',  label:'Cette année',                short:'Cette année'},
+  {id:'last_year',  label:'L\'an dernier',              short:'An dernier'},
+  {id:'custom',     label:'Plage personnalisée…',       short:'Plage'}
+];
+const FP_PERIOD_LABEL=Object.fromEntries(FP_PERIOD_PRESETS.map(p=>[p.id,p]));
+
+// Résout un preset en bornes [from, to] inclusives, à une date de référence.
+// `to` est exclusive en interne pour éviter les pièges de fin de journée.
+function fpResolvePeriod(scope, today){
+  if(!scope || !scope.preset || scope.preset==='all') return null;
+  const now=today||new Date();
+  const Y=now.getFullYear(), M=now.getMonth();
+  const d=(y,m,day)=>new Date(y,m,day,0,0,0,0);
+  switch(scope.preset){
+    case 'this_month':    return {from:d(Y,M,1),          to:d(Y,M+1,1)};
+    case 'last_month':    return {from:d(Y,M-1,1),        to:d(Y,M,1)};
+    case 'last_12m':      return {from:d(Y,M-11,1),       to:d(Y,M+1,1)};
+    case 'ytd':           return {from:d(Y,0,1),          to:d(Y,M,now.getDate()+1)};
+    case 'this_quarter':  { const q=Math.floor(M/3)*3; return {from:d(Y,q,1), to:d(Y,q+3,1)}; }
+    case 'last_quarter':  { const q=Math.floor(M/3)*3-3; return {from:d(Y,q,1), to:d(Y,q+3,1)}; }
+    case 'this_year':     return {from:d(Y,0,1),          to:d(Y+1,0,1)};
+    case 'last_year':     return {from:d(Y-1,0,1),        to:d(Y,0,1)};
+    case 'custom': {
+      const f=scope.from?parseDateValue(scope.from):null;
+      const t=scope.to?parseDateValue(scope.to):null;
+      if(!f&&!t) return null;
+      // La borne haute saisie est inclusive pour l'utilisateur : on ajoute un jour.
+      return {from:f||null, to:t?new Date(t.getFullYear(),t.getMonth(),t.getDate()+1):null};
+    }
+    default: return null;
+  }
+}
+
+// Colonne de date utilisée par la portée : celle du widget, sinon la première
+// colonne date du fichier.
+function fpPeriodCol(w){
+  if(w.period&&w.period.col&&columns.some(c=>c.name===w.period.col&&c.type==='date')) return w.period.col;
+  const ci=columns.find(c=>c.name===w.col);
+  if(ci&&ci.type==='date') return w.col;
+  const first=columns.find(c=>c.type==='date');
+  return first?first.name:null;
+}
+
+// Restreint des lignes à la portée du widget.
+function fpPeriodRows(w, base, today){
+  const range=fpResolvePeriod(w.period, today);
+  if(!range) return base;
+  const col=fpPeriodCol(w);
+  if(!col) return base;
+  return base.filter(r=>{
+    const d=parseDateValue(r[col]);
+    if(!d) return false;
+    if(range.from && d<range.from) return false;
+    if(range.to   && d>=range.to)  return false;
+    return true;
+  });
+}
+
+// Libellé affiché dans l'entête du widget.
+function fpPeriodBadge(w){
+  if(!w.period||!w.period.preset||w.period.preset==='all') return '';
+  const p=FP_PERIOD_LABEL[w.period.preset];
+  if(!p) return '';
+  let txt=p.short;
+  if(w.period.preset==='custom'){
+    const f=w.period.from||'…', t=w.period.to||'…';
+    txt=f+' → '+t;
+  }
+  const col=fpPeriodCol(w);
+  return '<div class="wc-period" title="'+esc('Portée : '+p.label+(col?' · sur '+colLabel(col):''))+'">📅 '+esc(txt)+'</div>';
+}
+
+// ── DRILL-DOWN ──────────────────────────────────────────────────────────
+// Deux hiérarchies, une seule mécanique :
+//   • dates   → année ▸ trimestre ▸ mois ▸ jour (automatique)
+//   • dimensions → l'ordre configuré dans le Tuning (w.drillCols)
+// L'état vit dans w.drill = [{col, key, label, grain}] : une pile, donc le
+// retour arrière est gratuit et le fil d'Ariane se lit directement dedans.
+const FP_DATE_HIERARCHY=['year','quarter','month','day'];
+const FP_GRAIN_LABEL={year:'Année',quarter:'Trimestre',month:'Mois',day:'Jour'};
+
+function fpDrillStack(w){ return Array.isArray(w.drill)?w.drill:[]; }
+
+// Clés canoniques dans l'ORDRE RÉELLEMENT AFFICHÉ. On les relit depuis les
+// libellés du graphique : bar.js et donut.js retrient après le calcul, donc
+// seule la correspondance libellé → clé fait foi.
+function fpWidgetKeys(w){
+  const map=w.__keyByLabel||{};
+  const ch=(typeof chartInstances!=='undefined')?chartInstances['chart-'+w.id]:null;
+  const labels=(ch&&ch.data&&Array.isArray(ch.data.labels))?ch.data.labels:Object.keys(map);
+  return labels.map(l=>map[String(l)]!==undefined?map[String(l)]:l);
+}
+window.fpWidgetKeys=fpWidgetKeys;
+
+// La colonne effectivement affichée au niveau courant.
+function fpDrillCol(w){
+  const st=fpDrillStack(w);
+  const ci=columns.find(c=>c.name===w.col);
+  if(ci&&ci.type==='date') return w.col;            // une date reste la même colonne
+  const chain=fpDrillChain(w);
+  return chain[Math.min(st.length, chain.length-1)]||w.col;
+}
+
+// Chaîne de dimensions : la colonne du widget puis les niveaux configurés.
+function fpDrillChain(w){
+  const extra=Array.isArray(w.drillCols)?w.drillCols.filter(n=>columns.some(c=>c.name===n)):[];
+  return [w.col].concat(extra.filter(n=>n!==w.col));
+}
+
+// Granularité courante pour une colonne date : on descend d'un cran par niveau.
+function fpDrillGrain(w){
+  const ci=columns.find(c=>c.name===w.col);
+  if(!ci||ci.type!=='date') return null;
+  const base=fpGrainOf(w.col);
+  let i=FP_DATE_HIERARCHY.indexOf(base);
+  if(i<0) i=FP_DATE_HIERARCHY.indexOf('month');
+  return FP_DATE_HIERARCHY[Math.min(i+fpDrillStack(w).length, FP_DATE_HIERARCHY.length-1)];
+}
+
+// Reste-t-il un niveau sous celui affiché ?
+function fpDrillCanDescend(w){
+  const ci=columns.find(c=>c.name===w.col);
+  if(ci&&ci.type==='date'){
+    const base=fpGrainOf(w.col);
+    let i=FP_DATE_HIERARCHY.indexOf(base); if(i<0) i=2;
+    return i+fpDrillStack(w).length < FP_DATE_HIERARCHY.length-1;
+  }
+  return fpDrillStack(w).length < fpDrillChain(w).length-1;
+}
+
+// Les lignes restreintes par la pile de drill du widget.
+function fpDrillRows(w, base){
+  const st=fpDrillStack(w);
+  if(!st.length) return base;
+  let out=base;
+  for(const lvl of st){
+    if(lvl.grain){
+      // Niveau temporel : on garde les lignes de la période cliquée.
+      out=out.filter(r=>{
+        const d=parseDateValue(r[lvl.col]); if(!d) return false;
+        return fpPeriodKey(d, lvl.grain)===lvl.key;
+      });
+    } else {
+      out=out.filter(r=>fpDrillMatch(r[lvl.col], lvl.key));
+    }
+  }
+  return out;
+}
+
+// groupByDim tronque ses clés à 30 caractères : on compare donc sur le même
+// préfixe, sinon un nom long ne matcherait jamais.
+function fpDrillMatch(cell, key){
+  const s=String(cell??'');
+  return s===key || s.slice(0,30)===key;
+}
+
+// Descendre d'un niveau. `key` est la valeur canonique, `label` l'affichage.
+function fpDrillDown(wid, key, label){
+  const w=widgets.find(x=>x.id===wid); if(!w) return;
+  if(!fpDrillCanDescend(w)) return;
+  const grain=fpDrillGrain(w);
+  const st=fpDrillStack(w).slice();
+  st.push({col:fpDrillCol(w), key:String(key), label:String(label??key), grain:grain||null});
+  w.drill=st;
+  clearAggregationCache();
+  renderWidgets();
+}
+
+// Remonter au niveau n (0 = tout en haut).
+function fpDrillUp(wid, n){
+  const w=widgets.find(x=>x.id===wid); if(!w) return;
+  w.drill=fpDrillStack(w).slice(0, Math.max(0,n));
+  clearAggregationCache();
+  renderWidgets();
+}
+
+// Fil d'Ariane affiché dans l'entête du widget.
+function fpDrillBreadcrumb(w){
+  const st=fpDrillStack(w);
+  if(!st.length) return '';
+  const crumbs=['<button type="button" class="fp-dc" onclick="event.stopPropagation();fpDrillUp(\''+w.id+'\',0)">Tout</button>']
+    .concat(st.map((l,i)=>
+      i===st.length-1
+        ? '<span class="fp-dc fp-dc-cur">'+esc(l.label)+'</span>'
+        : '<button type="button" class="fp-dc" onclick="event.stopPropagation();fpDrillUp(\''+w.id+'\','+(i+1)+')">'+esc(l.label)+'</button>'
+    ));
+  return '<div class="fp-drill-bar">'+crumbs.join('<span class="fp-dc-sep">\u203a</span>')+
+    '<button type="button" class="fp-dc fp-dc-rows" title="Voir les lignes correspondantes" '+
+    'onclick="event.stopPropagation();fpOpenDrillRows(\''+w.id+'\')">\u2261 Lignes</button></div>';
+}
+
+// Drill-through : les lignes qui composent le point affiché.
+function fpOpenDrillRows(wid){
+  const w=widgets.find(x=>x.id===wid); if(!w) return;
+  const base=(typeof window.cfRowsExcluding==='function'?window.cfRowsExcluding(w.id):null)||filteredRows||rows;
+  const sub=fpDrillRows(w, fpPeriodRows(w, base, fpToday()));
+  const path=fpDrillStack(w).map(l=>l.label).join(' \u203a ')||'Tout';
+  const cols=columns.slice(0,12);
+  const MAX=200;
+  const head='<tr>'+cols.map(c=>'<th>'+esc(colLabel(c.name))+'</th>').join('')+'</tr>';
+  const body=sub.slice(0,MAX).map(r=>'<tr>'+cols.map(c=>'<td>'+esc(formatTableCell(c.name,r[c.name],false,[]))+'</td>').join('')+'</tr>').join('');
+  const ov=document.getElementById('drill-rows-modal');
+  if(!ov) return;
+  document.getElementById('drill-rows-title').textContent=path;
+  document.getElementById('drill-rows-count').textContent=
+    sub.length.toLocaleString('fr-FR')+' ligne'+(sub.length>1?'s':'')+(sub.length>MAX?' — '+MAX+' affichées':'');
+  document.getElementById('drill-rows-table').innerHTML='<thead>'+head+'</thead><tbody>'+body+'</tbody>';
+  ov.dataset.wid=wid;
+  ov.style.display='flex';
+}
+function fpCloseDrillRows(){ const o=document.getElementById('drill-rows-modal'); if(o) o.style.display='none'; }
+
+// Export CSV des lignes affichées — le besoin qui suit immédiatement le clic.
+function fpDrillRowsCsv(){
+  const ov=document.getElementById('drill-rows-modal'); if(!ov) return;
+  const w=widgets.find(x=>x.id===ov.dataset.wid); if(!w) return;
+  const base=(typeof window.cfRowsExcluding==='function'?window.cfRowsExcluding(w.id):null)||filteredRows||rows;
+  const sub=fpDrillRows(w, fpPeriodRows(w, base, fpToday()));
+  const cell=v=>{ const s=String(v??''); return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; };
+  const csv=[columns.map(c=>cell(colLabel(c.name))).join(';')]
+    .concat(sub.map(r=>columns.map(c=>cell(r[c.name])).join(';'))).join('\r\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(fpDrillStack(w).map(l=>l.label).join('-')||'detail')+'.csv';
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+window.fpDrillUp=fpDrillUp; window.fpOpenDrillRows=fpOpenDrillRows;
+window.fpCloseDrillRows=fpCloseDrillRows; window.fpDrillRowsCsv=fpDrillRowsCsv;
+
+// ── TIME INTELLIGENCE ───────────────────────────────────────────────────
+// groupByTime() renvoie des libellés déjà mis en forme (« Jan 2026 ») et
+// tronqués à `limit` : inutilisable pour comparer à N-1, qui a besoin des
+// clés canoniques ET de l'historique complet. D'où cette variante.
+const FP_GRAIN_ALIAS={day:'day',week:'week',month:'month',quarter:'quarter',year:'year'};
+function fpGrainOf(dateCol){ return FP_GRAIN_ALIAS[colDateFormats[dateCol]||'month']||'month'; }
+
+function groupByTimeSeries(dateCol, valCol, aggr, grain){
+  return cachedAggregation(['tseries',dateCol,valCol||'',aggr||'',grain].join('§'),()=>{
+    const buckets=new Map();
+    for(let i=0;i<rows.length;i++){
+      const raw=rows[i][dateCol]; if(!raw) continue;
+      const d=parseDateValue(raw); if(!d) continue;
+      const k=fpPeriodKey(d,grain); if(!k) continue;
+      let b=buckets.get(k);
+      if(!b){ b={key:k,start:d,vals:[]}; buckets.set(k,b); }
+      else if(d<b.start) b.start=d;
+      b.vals.push(valCol?rows[i][valCol]:1);
+    }
+    const out=[];
+    buckets.forEach(b=>out.push({key:b.key,start:b.start,value:aggregate(b.vals, valCol?aggr:'count')}));
+    out.sort((a,b)=>a.key<b.key?-1:a.key>b.key?1:0);
+    return out;
+  });
+}
+
+// Construit ce qu'attend Chart.js pour un widget temporel : libellés lisibles
+// et jusqu'à trois jeux de données (valeur, comparaison, cumul ou moyenne).
+// Renvoie null si le widget n'a aucune option temporelle active.
+function fpBuildTimeIntel(w, limit){
+  if(typeof window.FP_computeTimeIntel!=='function') return null;
+  const cmp=w.compareMode&&w.compareMode!=='none'?w.compareMode:null;
+  const cum=w.cumulMode&&w.cumulMode!=='none'?w.cumulMode:null;
+  const mav=parseInt(w.movingAvg,10)>1?parseInt(w.movingAvg,10):null;
+  if(!cmp&&!cum&&!mav) return null;
+
+  const ci=columns.find(c=>c.name===w.col);
+  if(!ci||ci.type!=='date') return null;
+
+  const grain=fpGrainOf(w.col);
+  const pts=groupByTimeSeries(w.col, w.col2, w.aggr||'sum', grain);
+  if(!pts.length) return null;
+
+  const r=window.FP_computeTimeIntel(pts, grain, {
+    compare:cmp||'none', cumul:cum||'none', movingAvg:mav||0, today:new Date()
+  });
+  if(!r||!r.base||!r.base.length) return null;
+
+  // On calcule sur tout l'historique, on n'affiche que la fin.
+  const n=Math.max(2, limit||12);
+  const from=Math.max(0, r.base.length-n);
+  const slice=arr=>arr?arr.slice(from):null;
+  const labels=slice(r.base).map(p=>fpPeriodLabel(p.key,grain));
+  const keys=slice(r.base).map(p=>p.key);
+
+  return {
+    grain, labels, keys, summary:r.summary,
+    base:slice(r.base).map(p=>p.value),
+    compare:slice(r.compare)?.map(p=>p.value)||null,
+    cumul:slice(r.cumul)?.map(p=>p.value)||null,
+    movingAvg:slice(r.movingAvg)?.map(p=>p.value)||null,
+    compareLabel:(TIME_COMPARE_LABELS[cmp]||''),
+    cumulLabel:(TIME_CUMUL_LABELS[cum]||''),
+    movingAvgLabel:mav?('Moyenne '+mav+' périodes'):''
+  };
+}
+const TIME_COMPARE_LABELS={prev:'Période précédente', yoy:"Même période l'an dernier"};
+const TIME_CUMUL_LABELS={running:'Cumul total', ytd:'Cumul annuel', qtd:'Cumul trimestriel', mtd:'Cumul mensuel'};
+
+// Variation d'un KPI sur la dernière période close, vs la précédente ou N-1.
+function fpKpiCompare(w){
+  if(typeof window.FP_computeTimeIntel!=='function') return null;
+  const mode=w.kpiCompareMode;
+  if(!mode||mode==='none'||!w.kpiCompareDate) return null;
+  const ci=columns.find(c=>c.name===w.kpiCompareDate);
+  if(!ci||ci.type!=='date') return null;
+  const grain=fpGrainOf(w.kpiCompareDate);
+  const pts=groupByTimeSeries(w.kpiCompareDate, w.kpiCol, w.aggrKpi||'sum', grain);
+  if(pts.length<2) return null;
+  const r=window.FP_computeTimeIntel(pts, grain, {compare:mode, today:new Date()});
+  if(!r||!r.summary) return null;
+  const sum=r.summary;
+  const v=mode==='yoy'?sum.vsLastYear:sum.vsPrevious;
+  if(!v) return null;
+  return {
+    current:sum.last?sum.last.value:null,
+    previous:mode==='yoy'?(sum.lastYear?sum.lastYear.value:null):(sum.previous?sum.previous.value:null),
+    pct:v.pct, abs:v.abs, direction:v.direction,
+    partial:!!sum.lastPeriodPartial,
+    label:mode==='yoy'?"vs même période N-1":'vs période précédente',
+    periodLabel:sum.last?fpPeriodLabel(sum.last.key,grain):''
+  };
+}
+
 function groupByTime(dateCol, valCol, aggr, limit=12, sortMode){
   const fmt=colDateFormats[dateCol]||'month';
   return cachedAggregation(['time',dateCol,valCol||'',aggr||'',limit||12,fmt,sortMode||'label'].join('§'),()=>{
+    // Clés canoniques produites par le moteur temporel : une seule définition
+    // de « qu'est-ce qu'un mois », partagée avec la comparaison N-1 et le
+    // drill-down. Repli sur l'ancien calcul si le module n'est pas encore là.
+    const keyOf=(d)=>fpPeriodKey(d,fmt);
     const m={};
     rows.forEach(r=>{
       const raw=r[dateCol]; if(!raw) return;
       const d=parseDateValue(raw); if(!d) return;
-      let k='';
-      if(fmt==='day')     k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      else if(fmt==='week'){
-        // ISO week number
-        const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
-        tmp.setUTCDate(tmp.getUTCDate()+4-(tmp.getUTCDay()||7));
-        const yr=tmp.getUTCFullYear();
-        const wk=Math.ceil((((tmp-new Date(Date.UTC(yr,0,1)))/86400000)+1)/7);
-        k=`${yr}-S${String(wk).padStart(2,'0')}`;
-      }
-      else if(fmt==='month'){
-        k=`${String(d.getFullYear()).padStart(4,'0')}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      }
-      else if(fmt==='quarter') k=`T${Math.ceil((d.getMonth()+1)/3)} ${d.getFullYear()}`;
-      else if(fmt==='year')    k=`${d.getFullYear()}`;
+      const k=keyOf(d); if(!k) return;
       if(!m[k]) m[k]=[];
       m[k].push(valCol?r[valCol]:1);
     });
-    // pretty labels for month
-    const prettyLabel=(k)=>{
-      if(fmt==='month'){
-        const [yr,mo]=k.split('-');
-        const M=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
-        return `${M[parseInt(mo)-1]} ${yr}`;
-      }
-      return k;
-    };
+    const prettyLabel=(k)=>fpPeriodLabel(k,fmt);
     let entries=Object.entries(m).map(([k,v])=>[k, aggregate(v, valCol?aggr:'count')]);
     if(sortMode==='value'){
       entries.sort((a,b)=>b[1]-a[1]);
     } else {
       entries.sort((a,b)=>a[0].localeCompare(b[0]));
     }
-    return entries.map(([k,v])=>[prettyLabel(k), v]).slice(0,limit);
+    // 3e élément : la clé canonique, dont ont besoin le filtre croisé et le
+    // drill-down (le libellé « Jan 2026 » ne correspond à aucune valeur brute).
+    return entries.map(([k,v])=>[prettyLabel(k), v, k]).slice(0,limit);
   });
 }
 
@@ -2705,6 +3469,7 @@ async function loadSheetFromSource(source, sheetInfo, fileName, showSheetInName)
       parsed=XLSX.utils.sheet_to_json(source.wb.Sheets[sheetInfo.name],{defval:''});
     }
     if(!parsed.length){ fpLoadUI(false); toast(window.FP_t?window.FP_t('toast_empty_file'):'⚠ Feuille vide'); return; }
+    fpNormalizeRowDates(parsed);   // corrige la dérive de XLSX.js avant tout typage
     fpLoadSetPct(90);
     fpLoadUI(true,'Finalisation…','Détection des types de colonnes');
     fpLoadCreep(98);
@@ -2800,164 +3565,7 @@ function loadDemo(){
   loadData(demo,'Données démo transport');
 }
 
-// ── TEMPLATES ────────────────────────────────────────────────────────────
-const TEMPLATES={
-  transport:{
-    name:'Transport & Logistique',
-    data:()=>{
-      const tr=['Lorang','Portmann','Schenker','Geodis','DHL'];
-      const pays=['LU','DE','FR','BE','NL','PL'];
-      const st=['Livré','Retard','En cours','Annulé'];
-      const types=['FTL','LTL','Express'];
-      return Array.from({length:150},(_,i)=>({
-        'Date expédition':new Date(2026,Math.floor(i/12),(i%28)+1).toISOString().slice(0,10),
-        'Transporteur':tr[i%5],'Pays destination':pays[i%6],'Statut':st[i%4],
-        'Type transport':types[i%3],
-        'Poids (t)':Math.round((Math.random()*30+5)*10)/10,
-        'Coût (€)':Math.round(Math.random()*3500+600),
-        'Délai (j)':Math.floor(Math.random()*8+1),
-        'Client':['ArcelorMittal','Ternium','Salzgitter','Tata Steel'][i%4],
-        'N° DA':500000+i,
-      }));
-    },
-    widgets:[
-      {type:'kpi',kpiCol:'Poids (t)',aggrKpi:'sum',title:'Poids total expédié',color:'#EF9F27'},
-      {type:'kpi',kpiCol:'Coût (€)',aggrKpi:'sum',title:'Coût total',color:'#4a7fa5'},
-      {type:'kpi',kpiCol:'N° DA',aggrKpi:'count',title:'Nombre DA',color:'#1D9E75'},
-      {type:'kpi',kpiCol:'Délai (j)',aggrKpi:'avg',title:'Délai moyen',color:'#7F77DD'},
-      {type:'bar',col:'Transporteur',col2:'Poids (t)',aggr:'sum',title:'Poids par transporteur',color:'#EF9F27'},
-      {type:'donut',col:'Pays destination',aggr:'count',title:'Répartition par pays',color:'#4a7fa5'},
-      {type:'line',col:'Date expédition',col2:'Poids (t)',aggr:'sum',title:'Évolution poids',color:'#1D9E75'},
-      {type:'donut',col:'Statut',aggr:'count',title:'Statuts livraison',color:'#7F77DD'},
-      {type:'bar',col:'Pays destination',col2:'Coût (€)',aggr:'sum',title:'Coût par pays',color:'#D85A30'},
-      {type:'table',tableCols:['Date expédition','N° DA','Transporteur','Pays destination','Statut','Poids (t)'],title:'Détail expéditions'},
-    ]
-  },
-  finance:{
-    name:'Finance & Contrôle de gestion',
-    data:()=>{
-      const dept=['Commercial','Production','Logistique','IT','RH','Direction'];
-      const cats=['Salaires','Fournitures','Prestataires','Loyer','Équipement','Marketing'];
-      return Array.from({length:120},(_,i)=>({
-        'Date':new Date(2026,i%12,Math.floor(Math.random()*28)+1).toISOString().slice(0,10),
-        'Département':dept[i%6],'Catégorie':cats[i%6],
-        'CA (€)':Math.round(Math.random()*50000+5000),
-        'Charges (€)':Math.round(Math.random()*30000+3000),
-        'Marge (€)':Math.round(Math.random()*20000+1000),
-        'Budget (€)':Math.round(Math.random()*45000+8000),
-        'Statut':['Réalisé','Prévu','Écart'][i%3],
-      }));
-    },
-    widgets:[
-      {type:'kpi',kpiCol:'CA (€)',aggrKpi:'sum',title:'Chiffre d\'affaires',color:'#1D9E75'},
-      {type:'kpi',kpiCol:'Charges (€)',aggrKpi:'sum',title:'Charges totales',color:'#D85A30'},
-      {type:'kpi',kpiCol:'Marge (€)',aggrKpi:'sum',title:'Marge totale',color:'#EF9F27'},
-      {type:'gauge',gaugeCol:'Marge (€)',aggrGauge:'avg',gaugeMin:0,gaugeTarget:15000,gaugeMax:20000,title:'Marge moyenne vs cible',color:'#1D9E75'},
-      {type:'bar',col:'Département',col2:'CA (€)',aggr:'sum',title:'CA par département',color:'#4a7fa5'},
-      {type:'bar',col:'Catégorie',col2:'Charges (€)',aggr:'sum',title:'Charges par catégorie',color:'#D85A30'},
-      {type:'line',col:'Date',col2:'CA (€)',aggr:'sum',title:'Évolution CA',color:'#1D9E75'},
-      {type:'donut',col:'Département',col2:'Marge (€)',aggr:'sum',title:'Répartition marge',color:'#EF9F27'},
-    ]
-  },
-  rh:{
-    name:'Ressources Humaines',
-    data:()=>{
-      const dept=['Commercial','Production','Logistique','IT','RH','Direction'];
-      const contrats=['CDI','CDD','Intérim','Stage'];
-      const sites=['Paris','Lyon','Bordeaux','Lille','Strasbourg'];
-      return Array.from({length:100},(_,i)=>({
-        'Date entrée':new Date(2020+i%6,i%12,Math.floor(Math.random()*28)+1).toISOString().slice(0,10),
-        'Département':dept[i%6],'Contrat':contrats[i%4],'Site':sites[i%5],
-        'Salaire brut':Math.round((Math.random()*3000+2000)*10)/10,
-        'Absences (j)':Math.floor(Math.random()*15),
-        'Formations (h)':Math.floor(Math.random()*40),
-        'Ancienneté (an)':Math.floor(Math.random()*20)+1,
-        'Statut':['Actif','Congé','Formation'][i%3],
-      }));
-    },
-    widgets:[
-      {type:'kpi',kpiCol:'Salaire brut',aggrKpi:'count',title:'Effectif total',color:'#4a7fa5'},
-      {type:'kpi',kpiCol:'Absences (j)',aggrKpi:'avg',title:'Absences moyennes',color:'#D85A30'},
-      {type:'kpi',kpiCol:'Formations (h)',aggrKpi:'sum',title:'Heures formation',color:'#1D9E75'},
-      {type:'kpi',kpiCol:'Ancienneté (an)',aggrKpi:'avg',title:'Ancienneté moyenne',color:'#7F77DD'},
-      {type:'donut',col:'Département',aggr:'count',title:'Effectif par département',color:'#4a7fa5'},
-      {type:'donut',col:'Contrat',aggr:'count',title:'Types de contrats',color:'#EF9F27'},
-      {type:'bar',col:'Site',col2:'Salaire brut',aggr:'avg',title:'Salaire moyen par site',color:'#7F77DD'},
-      {type:'bar',col:'Département',col2:'Absences (j)',aggr:'sum',title:'Absences par département',color:'#D85A30'},
-      {type:'table',tableCols:['Département','Contrat','Site','Salaire brut','Ancienneté (an)','Statut'],title:'Vue collaborateurs'},
-    ]
-  },
-  commercial:{
-    name:'Commercial & Ventes',
-    data:()=>{
-      const clients=['Dupont SA','Martin SARL','Bernard & Co','Petit Industries','Durand Group'];
-      const produits=['Produit A','Produit B','Produit C','Service Pro','Formation'];
-      const vendeurs=['Alice M.','Bruno K.','Céline R.','David L.','Emma P.'];
-      const phases=['Prospect','Qualifié','Proposition','Négociation','Gagné','Perdu'];
-      return Array.from({length:130},(_,i)=>({
-        'Date':new Date(2026,i%12,Math.floor(Math.random()*28)+1).toISOString().slice(0,10),
-        'Client':clients[i%5],'Produit':produits[i%5],'Vendeur':vendeurs[i%5],
-        'Phase':phases[i%6],
-        'Montant (€)':Math.round(Math.random()*20000+1000),
-        'Quantité':Math.floor(Math.random()*50+1),
-        'Marge (%)':Math.round((Math.random()*30+10)*10)/10,
-        'Délai signature (j)':Math.floor(Math.random()*60+5),
-      }));
-    },
-    widgets:[
-      {type:'kpi',kpiCol:'Montant (€)',aggrKpi:'sum',title:'CA total',color:'#1D9E75'},
-      {type:'kpi',kpiCol:'Montant (€)',aggrKpi:'count',title:'Nombre d\'affaires',color:'#4a7fa5'},
-      {type:'kpi',kpiCol:'Marge (%)',aggrKpi:'avg',title:'Marge moyenne',color:'#EF9F27'},
-      {type:'kpi',kpiCol:'Délai signature (j)',aggrKpi:'avg',title:'Délai moyen',color:'#7F77DD'},
-      {type:'bar',col:'Vendeur',col2:'Montant (€)',aggr:'sum',title:'CA par vendeur',color:'#1D9E75'},
-      {type:'donut',col:'Produit',col2:'Montant (€)',aggr:'sum',title:'CA par produit',color:'#EF9F27'},
-      {type:'donut',col:'Phase',aggr:'count',title:'Entonnoir commercial',color:'#4a7fa5'},
-      {type:'line',col:'Date',col2:'Montant (€)',aggr:'sum',title:'Évolution CA',color:'#1D9E75'},
-      {type:'bar',col:'Client',col2:'Montant (€)',aggr:'sum',title:'CA par client',color:'#7F77DD'},
-    ]
-  },
-  production:{
-    name:'Production & Qualité',
-    data:()=>{
-      const lignes=['Ligne 1','Ligne 2','Ligne 3','Ligne 4'];
-      const produits=['Ref A100','Ref B200','Ref C300','Ref D400','Ref E500'];
-      const equipes=['Matin','Après-midi','Nuit'];
-      return Array.from({length:120},(_,i)=>({
-        'Date':new Date(2026,Math.floor(i/10),i%28+1).toISOString().slice(0,10),
-        'Ligne':lignes[i%4],'Produit':produits[i%5],'Équipe':equipes[i%3],
-        'Qté produite':Math.floor(Math.random()*500+100),
-        'Qté conforme':Math.floor(Math.random()*480+95),
-        'Rebuts':Math.floor(Math.random()*20),
-        'TRS (%)':Math.round((Math.random()*30+60)*10)/10,
-        'Temps arrêt (min)':Math.floor(Math.random()*60),
-        'Statut OF':['Terminé','En cours','Planifié'][i%3],
-      }));
-    },
-    widgets:[
-      {type:'kpi',kpiCol:'Qté produite',aggrKpi:'sum',title:'Production totale',color:'#1D9E75'},
-      {type:'kpi',kpiCol:'Rebuts',aggrKpi:'sum',title:'Rebuts totaux',color:'#D85A30'},
-      {type:'kpi',kpiCol:'TRS (%)',aggrKpi:'avg',title:'TRS moyen',color:'#EF9F27'},
-      {type:'gauge',gaugeCol:'TRS (%)',aggrGauge:'avg',gaugeMin:0,gaugeTarget:80,gaugeMax:100,title:'TRS vs objectif 80%',color:'#1D9E75'},
-      {type:'bar',col:'Ligne',col2:'Qté produite',aggr:'sum',title:'Production par ligne',color:'#4a7fa5'},
-      {type:'bar',col:'Équipe',col2:'TRS (%)',aggr:'avg',title:'TRS par équipe',color:'#EF9F27'},
-      {type:'line',col:'Date',col2:'Qté produite',aggr:'sum',title:'Évolution production',color:'#1D9E75'},
-      {type:'donut',col:'Statut OF',aggr:'count',title:'États des ordres',color:'#7F77DD'},
-    ]
-  },
-  generique:{
-    name:'Dashboard générique',
-    data:()=>{
-      return Array.from({length:50},(_,i)=>({
-        'Date':new Date(2026,i%12,i%28+1).toISOString().slice(0,10),
-        'Catégorie':['A','B','C','D'][i%4],
-        'Valeur 1':Math.round(Math.random()*1000),
-        'Valeur 2':Math.round(Math.random()*500),
-        'Statut':['OK','KO','Attente'][i%3],
-      }));
-    },
-    widgets:[]
-  },
-};
+// ── (bloc TEMPLATES supprimé : générateurs de données factices, jamais appelés)
 
 /* ── fpMonTableauDeBord — Canvas vierge ou chargement projet ── */
 function fpMonTableauDeBord(){
@@ -3044,73 +3652,6 @@ function fpMTBCharger(){
 }
 
 /* ── fpAutoTemplate — Analyse automatique IA ── */
-function fpAutoTemplate(){
-  if(!rows.length){ toast('⚠ Charge un fichier de données d\'abord'); return; }
-
-  // Construire la modale de sélection de colonnes
-  const existing = document.getElementById('fp-auto-modal');
-  if(existing) existing.remove();
-
-  const modal = document.createElement('div');
-  modal.id = 'fp-auto-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(13,27,42,.65);z-index:300;display:flex;align-items:center;justify-content:center';
-
-  const box = document.createElement('div');
-  box.style.cssText = 'background:var(--card);border-radius:20px;width:min(680px,95vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 28px 72px rgba(13,27,42,.28);overflow:hidden';
-
-  box.innerHTML = `
-    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-      <div>
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);margin-bottom:3px">Analyse automatique</div>
-        <div style="font-size:18px;font-weight:800;color:var(--navy);font-family:'Barlow Condensed',sans-serif;letter-spacing:-.02em">Sélectionnez vos colonnes</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px">FlowPilot analysera les colonnes cochées et proposera les meilleurs visuels</div>
-      </div>
-      <button onclick="document.getElementById('fp-auto-modal').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:4px">✕</button>
-    </div>
-    <div style="padding:16px 24px;flex:1;overflow-y:auto">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--mid)">${columns.length} colonnes détectées</div>
-        <button onclick="fpAutoSelectAll()" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;color:var(--mid);font-family:'DM Sans',sans-serif">Tout sélectionner</button>
-      </div>
-      <div id="fp-auto-cols" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
-    </div>
-    <div style="padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0">
-      <button onclick="document.getElementById('fp-auto-modal').remove()" style="flex:1;border:1px solid var(--border);background:var(--card);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--mid)">Annuler</button>
-      <button onclick="fpAutoGenerate()" style="flex:2;background:var(--accent);color:var(--navy);border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;font-family:'DM Sans',sans-serif">⚡ Analyser et générer</button>
-    </div>
-  `;
-
-  modal.appendChild(box);
-  document.body.appendChild(modal);
-
-  // Remplir les colonnes
-  const grid = document.getElementById('fp-auto-cols');
-  const TYPE_ICONS = { date:'📅', number:'#', text:'A', boolean:'◉' };
-  const TYPE_LABELS = { date:'Date', number:'Numérique', text:'Texte', boolean:'Booléen' };
-
-  columns.forEach(col => {
-    const item = document.createElement('label');
-    item.style.cssText = 'display:flex;align-items:center;gap:10px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;transition:all .15s;background:var(--card)';
-    item.innerHTML = `
-      <input type="checkbox" data-col="${col.name}" checked style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"/>
-      <span style="width:26px;height:26px;border-radius:7px;background:var(--accent-soft);display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">${TYPE_ICONS[col.type]||'?'}</span>
-      <span style="min-width:0">
-        <span style="display:block;font-size:11px;font-weight:700;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${col.name}</span>
-        <span style="display:block;font-size:9px;color:var(--muted)">${TYPE_LABELS[col.type]||col.type}</span>
-      </span>
-    `;
-    item.querySelector('input').addEventListener('change', () => {
-      item.style.borderColor = item.querySelector('input').checked ? 'var(--accent)' : 'var(--border)';
-      item.style.background  = item.querySelector('input').checked ? 'var(--accent-soft)' : '#fff';
-    });
-    // Highlight checked items by default
-    item.style.borderColor = 'var(--accent)';
-    item.style.background  = 'var(--accent-soft)';
-    grid.appendChild(item);
-  });
-
-  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
-}
 
 function fpAutoSelectAll(){
   const checks = document.querySelectorAll('#fp-auto-cols input[type=checkbox]');
@@ -3139,45 +3680,6 @@ function fpAutoGenerate(){
   window._fpAutoSelectedCols = null;
 }
 
-function loadTemplate(tplId){
-  const tpl=TEMPLATES[tplId];
-  if(!tpl) return;
-  selectedTemplateId=tplId;
-
-  // Nouveau flux V4 : après chargement d'un fichier, le template sert de point d'entrée
-  // pour générer les widgets à partir des données réellement importées.
-  if(rows.length && !sourceName.startsWith('Template ')){
-    if(tplId==='generique'){
-      widgets=[];
-      buildSidebar();
-      goStep(3);
-      toast(window.FP_t?window.FP_t('toast_blank_canvas_manual'):'✓ Canvas vierge ouvert — tu peux ajouter tes widgets manuellement');
-      return;
-    }
-
-    toast(`✓ Template "${tpl.name}" sélectionné — choisis les widgets proposés`);
-    showDetectModal();
-    return;
-  }
-
-  // Fallback : permet encore de charger un template de démonstration si aucune source n'est active.
-  const data=tpl.data();
-  rows=data; colAliases={}; colDateFormats={}; colDisplayFormats={}; widgets=[];
-  columns=Object.keys(data[0]).map(n=>({name:n,type:detectType(data.slice(0,50).map(r=>r[n]),n)}));
-  buildFieldModel();
-  sourceName=`Template ${tpl.name} · ${data.length} lignes · ${columns.length} colonnes`;
-  document.getElementById('source-pill').textContent=sourceName;
-  document.getElementById('source-pill').style.display='';
-
-  if(tpl.widgets.length>0){
-    widgets=tpl.widgets.map(w=>({...w,id:uid(),tableCols:w.tableCols||[]}));
-    buildSidebar();
-    goStep(3);
-    toast(`✓ Template "${tpl.name}" chargé — ${widgets.length} widgets pré-configurés`);
-  } else {
-    showQualityModal(tpl.name, ()=>showDetectModal());
-  }
-}
 
 // ── DATA QUALITY ──────────────────────────────────────────────────────────
 let qualityCallback=null;
@@ -3223,7 +3725,7 @@ function showQualityModal(name, callback){
         <div class="quality-row-detail">
           ${total} valeurs · ${empty} vides (${emptyPct}%) · ${[...new Set(vals.filter(v=>v!==''&&v!=null))].length} valeurs distinctes
           ${hasOutliers?'<br>⚠ <strong>Valeurs aberrantes</strong> détectées — vérifier les données sources':''}
-          ${empty>0?`<br><button class="qfix-btn" onclick="fixNulls('${col.name.replace(/'/g,"\\'")}')">🔧 Remplacer les vides par ${col.type==='number'?'0':'—'}</button>`:''}
+          ${empty>0?`<br><button class="qfix-btn" data-col="${esc(col.name)}" onclick="fixNulls(this.dataset.col)">🔧 Remplacer les vides par ${col.type==='number'?'0':'—'}</button>`:''}
         </div>
       </div>`);
   });
@@ -3315,7 +3817,6 @@ function closeQuality(){
 }
 
 // ── SMART DETECT ──────────────────────────────────────────────────────────
-let detectSuggestions=[];
 
 // ── AI ONBOARDING CHAT ───────────────────────────────────────────────────
 let aiPendingWidgets = [];
@@ -3325,7 +3826,7 @@ function aiChatResize(el){
   el.style.height=Math.min(el.scrollHeight,120)+'px';
 }
 function aiChatKeydown(e){
-  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); aiChatSend(); }
+  return;
 }
 
 function aiChatMsg(html, isUser=false){
@@ -3388,131 +3889,6 @@ function showDetectModal(){
   }, 300);
 }
 
-async function aiChatSend(){
-  const ta=document.getElementById('ai-chat-textarea');
-  const btn=document.getElementById('ai-chat-send');
-  const text=ta.value.trim();
-  if(!text) return;
-
-  aiChatMsg(esc(text), true);
-  ta.value=''; ta.style.height='auto';
-  btn.disabled=true;
-
-  const tid=aiChatTyping();
-
-  // Vérifier la clé OpenAI
-  if(!getOpenAIKey()){
-    aiRemoveTyping(tid);
-    showKeyPrompt(null);
-    document.getElementById('ai-chat-send').disabled=false;
-    return;
-  }
-
-  // Construire le contexte colonnes pour GPT
-  const measureCols=columns.filter(c=>isMeasureColumn(c.name));
-  const dateCols=columns.filter(c=>isDateColumn(c.name));
-  const dimCols=columns.filter(c=>isDimensionLike(c.name)&&!isIdentifierColumn(c.name));
-  const colors=['#EF9F27','#4a7fa5','#1D9E75','#7F77DD','#D85A30','#85BC25'];
-
-  const systemPrompt=`Tu es un assistant BI expert intégré dans FlowPilot Studio. 
-L'utilisateur vient d'uploader un fichier avec les colonnes suivantes :
-- Mesures numériques : ${measureCols.map(c=>c.name).join(', ')||'aucune'}
-- Colonnes date : ${dateCols.map(c=>c.name).join(', ')||'aucune'}
-- Dimensions texte : ${dimCols.map(c=>c.name).join(', ')||'aucune'}
-- Total lignes : ${rows.length}
-- Date du jour : ${new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})}
-
-Tu dois UNIQUEMENT répondre avec un JSON valide (pas de markdown, pas de texte avant ou après) contenant :
-{
-  "message": "Message court et naturel pour l'utilisateur (1-2 phrases max, en français)",
-  "widgets": [
-    {
-      "type": "kpi|bar|line|donut|table|bar-compare",
-      "title": "Titre du widget",
-      "col": "nom_colonne_dimension (pour bar/bar-compare/donut)",
-      "col2": "nom_colonne_mesure (pour bar/bar-compare/line)",
-      "kpiCol": "nom_colonne (si type=kpi)",
-      "aggrKpi": "sum|count|avg|min|max (si type=kpi)",
-      "aggr": "sum|count|avg (si type=bar/bar-compare/line/donut)",
-      "tableCols": ["col1","col2"] (si type=table),
-      "color": "#couleur_hex première série",
-      "color2": "#couleur_hex deuxième série (si type=bar-compare)",
-      "compareDate": "nom_colonne_date (si type=bar-compare)",
-      "periods": [
-        {"label": "Juin 2026", "from": "2026-06-01", "to": "2026-06-30", "color": "#4a7fa5"},
-        {"label": "Juin 2025", "from": "2025-06-01", "to": "2025-06-30", "color": "#EF9F27"}
-      ]
-    }
-  ]
-}
-
-Règles strictes :
-- Utilise UNIQUEMENT les noms de colonnes exacts listés ci-dessus
-- Pour type=kpi : renseigne kpiCol et aggrKpi
-- Pour type=bar/line : col=dimension ou date, col2=mesure
-- Pour type=donut : col=dimension, pas de col2
-- Pour type=table : tableCols=liste de colonnes
-- Pour type=bar-compare : utilise OBLIGATOIREMENT quand l'utilisateur demande une comparaison entre périodes (ex: "juin 2026 vs juin 2025", "3 dernières années", "01/06 au 15/06 sur 3 ans"). Renseigne col=dimension, col2=mesure, compareDate=colonne date, et periods=[{label, from:YYYY-MM-DD, to:YYYY-MM-DD, color}] avec autant de périodes que demandé. Calcule les dates précises à partir de la date du jour fournie.
-- Génère entre 2 et 6 widgets selon la demande
-- Choisis des couleurs parmi : ${colors.join(' / ')}
-- Si la demande est floue, génère des widgets pertinents basés sur les colonnes disponibles`;
-
-  try {
-    const raw=(await fpAiChat([
-      {role:'system', content:systemPrompt},
-      {role:'user', content:text}
-    ],{maxTokens:1200, temperature:0.3}))||'{}';
-    
-    let parsed;
-    try {
-      // Nettoyer les backticks éventuels
-      const clean=raw.replace(/```json|```/g,'').trim();
-      parsed=JSON.parse(clean);
-    } catch(e){
-      throw new Error('Réponse IA invalide — réessaie.');
-    }
-
-    aiRemoveTyping(tid);
-
-    const {message='', widgets:sugWidgets=[]}=parsed;
-
-    // Valider et filtrer les widgets (colonnes existantes uniquement)
-    const colNames=columns.map(c=>c.name);
-    const validWidgets=sugWidgets.filter(w=>{
-      if(w.type==='kpi') return w.kpiCol&&colNames.includes(w.kpiCol);
-      if(w.type==='table') return w.tableCols&&w.tableCols.some(c=>colNames.includes(c));
-      if(w.type==='donut') return w.col&&colNames.includes(w.col);
-      return w.col&&w.col2&&colNames.includes(w.col)&&colNames.includes(w.col2);
-    });
-
-    // Message IA
-    if(message) aiChatMsg(message.replace(/\n/g,'<br>'));
-
-    // Afficher les widgets proposés sous forme de chips
-    if(validWidgets.length){
-      aiPendingWidgets=validWidgets;
-      const icons={kpi:'◈',bar:'▬',line:'⟋',donut:'◎',table:'⊞'};
-      let html=`<div style="font-size:12px;color:var(--mid);margin-bottom:6px">Je te propose <strong>${validWidgets.length} widget${validWidgets.length>1?'s':''}</strong> :</div><div class="ai-widget-preview">`;
-      validWidgets.forEach(w=>{
-        html+=`<div class="ai-widget-chip">
-          <span class="wc-icon">${icons[w.type]||'◈'}</span>
-          <div><div class="wc-label">${esc(w.title||w.type)}</div></div>
-        </div>`;
-      });
-      html+=`</div><div style="font-size:11px;color:var(--muted);margin-top:8px">Cliquez sur <strong>Générer</strong> ou précisez vos besoins ↓</div>`;
-      aiChatMsg(html);
-      document.getElementById('ai-apply-btn').classList.add('visible');
-    } else {
-      aiChatMsg(`Je n'ai pas pu générer de widgets valides. Pouvez-vous préciser quelles colonnes vous souhaitez analyser ?`);
-    }
-
-  } catch(err){
-    aiRemoveTyping(tid);
-    aiChatMsg(`<span style="color:var(--coral)">❌ ${esc(err.message)}</span>`);
-  } finally {
-    btn.disabled=false;
-  }
-}
 
 function aiApplyWidgets(){
   if(!aiPendingWidgets.length) return;
@@ -3531,7 +3907,6 @@ function skipDetect(){
 
 // Garder applyDetect pour compatibilité (fallback)
 function applyDetect(){ aiApplyWidgets(); }
-function toggleSuggestion(){}
 
 // ── SIDEBAR ──────────────────────────────────────────────────────────────
 function buildSidebar(){
@@ -3567,9 +3942,11 @@ function renderColList(query){
       if(i<0) return esc(str);
       return esc(str.slice(0,i))+'<mark style="background:var(--accent-soft);color:var(--navy);border-radius:3px;padding:0 1px">'+esc(str.slice(i,i+q.length))+'</mark>'+esc(str.slice(i+q.length));
     };
-    const safeCol=col.name.replace(/'/g,"\\'");
-    const dateFmtBtn=col.type==='date'?`<button class="col-date-btn${fmt?' active':''}" title="${fmt?'Format : '+fmtObj?.label:'Changer le format de date'}" onclick="openDateFmt('${safeCol}')">📅${fmt?'<span style="font-size:8px;font-weight:800;margin-left:1px">'+fmtObj?.badge+'</span>':''}</button>`:'';
-    const typeBtn=`<button class="col-type-btn" title="Changer le type de données" onclick="openDataType('${safeCol}')">Type</button>`;
+    // Le nom de colonne vient du fichier utilisateur : il transite par un attribut
+    // data- échappé, jamais par une chaîne JS interpolée dans onclick (XSS).
+    const dataCol=`data-col="${esc(col.name)}"`;
+    const dateFmtBtn=col.type==='date'?`<button class="col-date-btn${fmt?' active':''}" ${dataCol} title="${esc(fmt?'Format : '+(fmtObj?.label||''):'Changer le format de date')}" onclick="openDateFmt(this.dataset.col)">📅${fmt?'<span style="font-size:8px;font-weight:800;margin-left:1px">'+esc(fmtObj?.badge||'')+'</span>':''}</button>`:'';
+    const typeBtn=`<button class="col-type-btn" ${dataCol} title="Changer le type de données" onclick="openDataType(this.dataset.col)">Type</button>`;
     list.insertAdjacentHTML('beforeend',`
       <div class="col-item">
         <div class="${cls}">${icon}</div>
@@ -3579,7 +3956,7 @@ function renderColList(query){
         </div>
         ${dateFmtBtn}
         ${typeBtn}
-        <button class="col-edit-btn" title="Renommer" onclick="openRename('${safeCol}')">✏</button>
+        <button class="col-edit-btn" ${dataCol} title="Renommer" onclick="openRename(this.dataset.col)">✏</button>
       </div>`);
   });
 }
@@ -3805,26 +4182,8 @@ function openModal(defaultType, widgetId){
 
   updateModalVisibility(type);
 
-  // Injecter le panneau options Histogramme si disponible
-  const barOptEl=document.getElementById('modal-bar-options');
-  if(barOptEl && typeof window.FP_renderBarPanel==='function'){
-    const wBar=w||{barVariant:'vertical',barColor:'mono',color:appAccent,barSort:'desc',barRounded:5,showValues:true};
-    barOptEl.innerHTML=window.FP_renderBarPanel(wBar, ()=>{});
-    // Wiring live : slider arrondi
-    const sl=barOptEl.querySelector('#bp-rounded');
-    if(sl) sl.addEventListener('input',function(){
-      const vl=barOptEl.querySelector('#bp-rounded-val');
-      if(vl) vl.textContent=this.value+'px';
-    });
-    // Color mode toggle : afficher/masquer le color picker
-    barOptEl.querySelectorAll('input[name="bp-color"]').forEach(r=>{
-      r.addEventListener('change',function(){
-        const row=barOptEl.querySelector('.bp-color-row');
-        if(row) row.style.opacity=this.value==='mono'?'1':'0.4';
-        if(row) row.style.pointerEvents=this.value==='mono'?'':'none';
-      });
-    });
-  }
+  // (panneau Histogramme de bar.js retiré : il était injecté puis masqué
+  //  aussitôt par updateModalVisibility ; les réglages vivent dans le Tuning.)
 
   document.getElementById('modal-overlay').classList.add('open');
 }
@@ -3983,6 +4342,59 @@ function selectColor(c, btn){
 
 function closeModal(){document.getElementById('modal-overlay').classList.remove('open');editingId=null;}
 
+// Un patch de widget proposé par un LLM est du contenu non fiable : on ne
+// retient que les propriétés connues, avec le bon type et des valeurs valides.
+const FP_WIDGET_PATCH_ALLOW = {
+  type:'enum', col:'col', col2:'col', kpiCol:'col', gaugeCol:'col', geoCatCol:'col',
+  title:'text', aggr:'aggr', aggrKpi:'aggr', aggrGauge:'aggr',
+  color:'color', color2:'color', barColor:'color',
+  height:'int', widthCols:'int', barTopN:'int', valueDecimals:'int',
+  gaugeMin:'num', gaugeMax:'num', gaugeTarget:'num', barGoal:'num', barGoalMax:'num',
+  showValues:'bool', axisSwapped:'bool', lineFill:'bool', barRounded:'bool', barTrend:'bool',
+  tableMode:'text', tableAggr:'aggr', barSort:'text', barVariant:'text', lineSortMode:'text',
+  geoScope:'text', geoPalette:'text', geoCpCountry:'text', valueFormat:'text',
+  valueCurrency:'text', valueUnit:'text', valueThousands:'bool', barGoalLabel:'text',
+  fontFamily:'text', tableCols:'cols',
+  compareMode:'text', cumulMode:'text', movingAvg:'int',
+  kpiCompareMode:'text', kpiCompareDate:'col',
+  drillMode:'text', drillCols:'cols',
+  period:'period'
+};
+function fpSanitizeWidgetPatch(raw){
+  const out={};
+  if(!raw || typeof raw!=='object' || Array.isArray(raw)) return out;
+  const colNames=columns.map(c=>c.name);
+  const aggrIds=(typeof AGGR_TYPES!=='undefined'?AGGR_TYPES:[]).map(a=>a.id);
+  const typeIds=(typeof CHART_TYPES!=='undefined'?CHART_TYPES:[]).map(t=>t.id);
+  Object.keys(FP_WIDGET_PATCH_ALLOW).forEach(k=>{
+    if(!Object.prototype.hasOwnProperty.call(raw,k)) return;
+    const v=raw[k], kind=FP_WIDGET_PATCH_ALLOW[k];
+    if(v===null||v===undefined) return;
+    switch(kind){
+      case 'enum':  if(typeIds.includes(v)) out[k]=v; break;
+      case 'col':   if(colNames.includes(v)) out[k]=v; break;
+      case 'aggr':  if(aggrIds.includes(v)) out[k]=v; break;
+      case 'color': { const c=safeColor(v,null); if(c&&String(v).trim()===c) out[k]=c; break; }
+      case 'int':   { const n=parseInt(v,10); if(isFinite(n)) out[k]=Math.max(0,Math.min(9999,n)); break; }
+      case 'num':   { const n=parseFloat(v);   if(isFinite(n)) out[k]=n; break; }
+      case 'bool':  if(typeof v==='boolean') out[k]=v; break;
+      case 'cols':  if(Array.isArray(v)) out[k]=v.filter(x=>colNames.includes(x)).slice(0,50); break;
+      case 'text':  if(typeof v==='string') out[k]=v.slice(0,200); break;
+      case 'period': {
+        if(typeof v!=='object'||Array.isArray(v)) break;
+        const pid=FP_PERIOD_PRESETS.find(p=>p.id===v.preset);
+        if(!pid) break;
+        out[k]={preset:v.preset,
+                col:colNames.includes(v.col)?v.col:null,
+                from:typeof v.from==='string'?v.from.slice(0,10):'',
+                to:  typeof v.to==='string'?v.to.slice(0,10):''};
+        break;
+      }
+    }
+  });
+  return out;
+}
+
 function saveWidget(){
   const type=modalSelType;
   const col=document.getElementById('modal-col').value;
@@ -4091,15 +4503,14 @@ function renderWidgets(){
             <div style="min-width:0">
               <div class="wc-title">${esc(titleText)}</div>
               ${subText?`<div class="wc-col">${esc(subText)}</div>`:''}
-              ${(()=>{const p=typeof getActivePeriodLabel==='function'?getActivePeriodLabel():'';return p?`<div class="wc-period">📅 ${esc(p)}</div>`:''})()}
+              ${fpPeriodBadge(w)||(()=>{const p=typeof getActivePeriodLabel==='function'?getActivePeriodLabel():'';return p?`<div class="wc-period">📅 ${esc(p)}</div>`:''})()}
+              ${fpDrillBreadcrumb(w)}
             </div>
             <div class="wc-actions" style="position:relative">
               <button class="wc-btn zoom-btn" title="Plein écran" onclick="event.stopPropagation();openZoom('${w.id}')">⛶</button>
               <button class="wc-btn" title="Tuning avancé" onclick="event.stopPropagation();openTuning('${w.id}')" style="font-size:10px;padding:4px 8px">⚙ Tuning</button>
-              <button class="wc-btn ai-btn" title="Demander à l'IA" onclick="event.stopPropagation();toggleWidgetAI('${w.id}',this)">✨ IA</button>
               <button class="wc-btn edit-btn" title="Modifier" onclick="event.stopPropagation();openModal('${w.type}','${w.id}')">Modifier</button>
               <button class="wc-btn del" title="Supprimer" onclick="event.stopPropagation();removeWidget('${w.id}')">✕</button>
-              <div class="wc-ai-box" id="wc-ai-${w.id}"></div>
             </div>
           </div>
           <div class="wc-body" id="wb-${w.id}" style="${h!=='auto'?'height:calc('+h+'px - 52px);overflow:auto':''}"></div>
@@ -4161,7 +4572,55 @@ function getWidgetSub(w){
   return col2?`${colLabel(col)} → ${colLabel(col2)}`:colLabel(col);
 }
 
+// Badge de variation d'un KPI. La flèche et le mot portent le sens ; la
+// couleur ne fait que le renforcer (elle ne doit jamais être le seul signal).
+function fpRenderKpiDelta(c){
+  if(c.pct===null||c.pct===undefined){
+    return `<div class="kpi-trend" style="color:var(--muted)">${esc(c.label)} — pas de référence</div>`;
+  }
+  const up=c.direction==='up', flat=c.direction==='flat';
+  const arrow=flat?'→':(up?'↑':'↓');
+  const col=flat?'var(--muted)':(up?'#006300':'#d03b3b');
+  const pct=Math.abs(c.pct)<0.05?'0':(c.pct>0?'+':'−')+Math.abs(c.pct).toLocaleString('fr-FR',{maximumFractionDigits:1});
+  const prev=c.previous==null?'—':fmtNum(c.previous);
+  // Comparer une période en cours à une période complète est le piège n°1 du
+  // reporting : on le signale au lieu de le masquer.
+  const warn=c.partial?`<span title="La dernière période n'est pas terminée : la comparaison porte sur une période incomplète." style="color:var(--muted);cursor:help"> ⚠</span>`:'';
+  return `<div class="kpi-trend" style="color:${col};display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
+    <span style="font-weight:800">${arrow} ${pct} %</span>
+    <span style="color:var(--muted);font-weight:500">${esc(c.label)} (${prev})</span>${warn}
+  </div>`;
+}
+
+// Point d'entrée du rendu. Si le widget est descendu dans sa hiérarchie, on
+// restreint les lignes et — pour une colonne date — on affine la granularité,
+// puis on délègue au rendu réel. try/finally : l'état global est toujours rendu.
 function renderWidgetBody(w, containerId, isPreview){
+  const st=fpDrillStack(w);
+  const hasPeriod=!!(w.period&&w.period.preset&&w.period.preset!=='all');
+  if(!st.length&&!hasPeriod) return renderWidgetBodyRaw(w, containerId, isPreview);
+  const orows=rows, ofil=filteredRows;
+  const ci=columns.find(c=>c.name===w.col);
+  const isDate=!!ci&&ci.type==='date';
+  const ofmt=isDate?colDateFormats[w.col]:undefined;
+  const ocol=w.col;
+  try{
+    // Portée du widget d'abord, puis sa pile d'exploration.
+    rows=fpDrillRows(w, fpPeriodRows(w, filteredRows||rows, fpToday()));
+    filteredRows=null;
+    if(isDate) colDateFormats[w.col]=fpDrillGrain(w);
+    // Hiérarchie de dimensions : le niveau courant change la colonne
+    // regroupée. Sans ça, descendre sur « Schenker » affichait une seule
+    // barre « Schenker » au lieu de ses clients.
+    else w.col=fpDrillCol(w);
+    return renderWidgetBodyRaw(w, containerId, isPreview);
+  } finally {
+    rows=orows; filteredRows=ofil; w.col=ocol;
+    if(isDate){ if(ofmt===undefined) delete colDateFormats[w.col]; else colDateFormats[w.col]=ofmt; }
+  }
+}
+
+function renderWidgetBodyRaw(w, containerId, isPreview){
   const el=document.getElementById(containerId);
   if(!el) return;
   const color=w.color||appAccent;
@@ -4174,10 +4633,12 @@ function renderWidgetBody(w, containerId, isPreview){
     const kpiValId='kv-'+containerId;
     const kpiFontFamily=(w.fontFamily&&typeof window.FP_getFontFamily==='function')?window.FP_getFontFamily(w.fontFamily):"'DM Sans',sans-serif";
     if(w.fontFamily && typeof window.FP_loadFont==='function') window.FP_loadFont(w.fontFamily);
+    // Variation sur la dernière période, si le widget est configuré pour.
+    const cmp=fpKpiCompare(w);
     el.innerHTML=`<div class="kpi-display">
       <div class="kpi-val" id="${kpiValId}" style="font-family:${kpiFontFamily};font-size:40px;font-weight:600;letter-spacing:-.02em">0</div>
       <div class="kpi-sub">${aggrLabel} — ${esc(colLabel(w.kpiCol))}</div>
-      <div class="kpi-trend" style="color:${color}">↑ ${rows.length.toLocaleString()} lignes analysées</div>
+      ${cmp?fpRenderKpiDelta(cmp):`<div class="kpi-trend" style="color:${safeColor(color)}">↑ ${rows.length.toLocaleString()} lignes analysées</div>`}
     </div>`;
     if(typeof animateKpiCount==='function') animateKpiCount(kpiValId, val, null, w);
     else { const elv=document.getElementById(kpiValId); if(elv) elv.textContent=fmtNum(val); }
@@ -4200,7 +4661,7 @@ function renderWidgetBody(w, containerId, isPreview){
     el.innerHTML=`<div class="gauge-wrap">
       <svg width="160" height="90" viewBox="0 0 160 90">
         <path d="M14,78 A65,65 0 0,1 146,78" fill="none" stroke="#eef2f7" stroke-width="14" stroke-linecap="round"/>
-        <path d="M14,78 A65,65 0 0,1 146,78" fill="none" stroke="${color}" stroke-width="14" stroke-linecap="round"
+        <path d="M14,78 A65,65 0 0,1 146,78" fill="none" stroke="${safeColor(color)}" stroke-width="14" stroke-linecap="round"
           stroke-dasharray="${pct*204} 204"/>
         <!-- target marker -->
         <circle cx="${tx}" cy="${ty}" r="5" fill="${isOk?'#1D9E75':'#D85A30'}" stroke="#fff" stroke-width="2"/>
@@ -4240,11 +4701,21 @@ function renderWidgetBody(w, containerId, isPreview){
     data=colInfo?.type==='date'?groupByTime(w.col,w.col2,w.aggr||'sum',12,lineSortDim):groupByDim(w.col,w.col2,w.aggr||'count',12,lineSortDim);
   } else if(w.type==='geo'){
     data=groupByDim(w.col,w.col2,w.aggr||(w.col2?'sum':'count'),300);
+  } else if(colInfo?.type==='date' && (w.type==='bar'||w.type==='donut')){
+    // Une colonne date regroupée par valeur brute produit une barre par jour :
+    // illisible, et incompatible avec le drill-down. On regroupe par période.
+    data=groupByTime(w.col,w.col2,w.aggr||'sum',w.type==='donut'?8:12,(w.lineSortMode||'label')==='label'?'label':'value');
   } else {
     data=groupByDim(w.col,w.col2,w.aggr||(w.col2?'sum':'count'),10);
   }
   labels=data.map(d=>d[0]);
   values=data.map(d=>d[1]);
+  // Indexé par libellé, pas par position : bar.js et donut.js retrient les
+  // séries après coup, un tableau parallèle se désynchroniserait (cliquer
+  // « T3 » descendait alors dans T2). Une barre « Autres » n'a pas de clé et
+  // retombe donc sur son libellé, ce qui la rend simplement non cliquable.
+  w.__keyByLabel={};
+  data.forEach(d=>{ w.__keyByLabel[String(d[0])]=d[2]!==undefined?d[2]:d[0]; });
 
   if(w.type==='donut'){
     if(typeof window.FP_renderDonut === 'function'){
@@ -4431,32 +4902,77 @@ function renderWidgetBody(w, containerId, isPreview){
   }
 
     if(w.type==='line'){
-    // Le tri (label/valeur) est déjà appliqué en amont par groupByDim/groupByTime
-    const lineLabels=labels, lineValues=values;
-    const lineColor=(w.color&&typeof w.color==='string'&&w.color.startsWith('#')&&w.color.length>=4)?w.color:'#4a7fa5';
+    const lineColor=safeColor(w.color,'#4a7fa5');
     const lineFill=!!w.lineFill; // false par défaut = pas de remplissage, juste la courbe
+
+    // Time intelligence : si le widget compare, cumule ou lisse, on remplace
+    // libellés et séries par ceux du moteur temporel.
+    const ti=fpBuildTimeIntel(w, 12);
+    const lineLabels=ti?ti.labels:labels;
+    const lineValues=ti?ti.base:values;
+    if(ti){ w.__keyByLabel={}; ti.labels.forEach((l,i)=>{ w.__keyByLabel[String(l)]=ti.keys[i]; }); }
+
+    const datasets=[{
+      label:ti?(colLabel(w.col2)||'Valeur'):'Valeur',
+      data:lineValues,
+      borderColor:lineColor,
+      backgroundColor:lineFill?lineColor+'26':'transparent',
+      borderWidth:2.5,
+      pointRadius:3,
+      pointBackgroundColor:lineColor,
+      fill:lineFill,
+      tension:0.3,
+      order:1
+    }];
+    if(ti){
+      // La comparaison est en pointillé : c'est un repère, pas la mesure.
+      if(ti.compare) datasets.push({
+        label:ti.compareLabel, data:ti.compare,
+        borderColor:FP_TI_COLORS.compare, backgroundColor:'transparent',
+        borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, tension:0.3, order:3, spanGaps:false
+      });
+      if(ti.movingAvg) datasets.push({
+        label:ti.movingAvgLabel, data:ti.movingAvg,
+        borderColor:FP_TI_COLORS.avg, backgroundColor:'transparent',
+        borderWidth:2, pointRadius:0, fill:false, tension:0.4, order:2, spanGaps:true
+      });
+      if(ti.cumul) datasets.push({
+        label:ti.cumulLabel, data:ti.cumul,
+        borderColor:FP_TI_COLORS.cumul, backgroundColor:'transparent',
+        borderWidth:2, pointRadius:0, fill:false, tension:0.25, order:4,
+        yAxisID:'yCumul'
+      });
+    }
+
+    const multi=datasets.length>1;
+    const scales={
+      x:{grid:{display:true,color:FP_THEME.grid},ticks:{font:{size:11},maxRotation:38,autoSkip:true,maxTicksLimit:12}},
+      y:{grid:{display:true,color:FP_THEME.grid},ticks:{font:{size:11},callback:v=>fmtNum(v)}}
+    };
+    // Le cumul vit sur une échelle bien plus haute : sans axe dédié il écrase
+    // la courbe principale. L'axe est masqué pour ne pas alourdir la lecture.
+    if(ti&&ti.cumul) scales.yCumul={position:'right',display:false,grid:{display:false}};
+
     el.innerHTML=`<div class="chart-wrap" style="background:var(--card)"><canvas id="${canvasId}"></canvas></div>`;
     chartInstances[canvasId]=new Chart(document.getElementById(canvasId),{
       type:'line',
-      data:{labels:lineLabels,datasets:[{
-        data:lineValues,
-        borderColor:lineColor,
-        backgroundColor:lineFill?lineColor+'26':'transparent',
-        borderWidth:2.5,
-        pointRadius:3,
-        pointBackgroundColor:lineColor,
-        fill:lineFill,
-        tension:0.3
-      }]},
-      options:{responsive:true,maintainAspectRatio:false,animation:false,responsiveAnimationDuration:0,normalized:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtNum(c.raw)}},fpValueLabels:{display:true,maxLabels:12}},
-        layout:{padding:{top:18}},scales:{
-          x:{grid:{display:true,color:FP_THEME.grid},ticks:{font:{size:18,weight:'bold'},maxRotation:38,autoSkip:false}},
-          y:{grid:{display:true,color:FP_THEME.grid},ticks:{font:{size:18,weight:'bold'},callback:v=>fmtNum(v)}}
-        }}
+      data:{labels:lineLabels,datasets},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,responsiveAnimationDuration:0,normalized:true,
+        interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{display:multi,position:'bottom',labels:{boxWidth:10,boxHeight:10,font:{size:10},usePointStyle:true,pointStyle:'line'}},
+          tooltip:{callbacks:{label:c=>`${c.dataset.label} : ${c.raw==null?'—':fmtNum(c.raw)}`}},
+          fpValueLabels:{display:!multi,maxLabels:12}
+        },
+        layout:{padding:{top:18}}, scales}
     });
     return;
   }
 }
+
+// Couleurs des séries dérivées. Distinctes de l'accent du widget pour que la
+// mesure reste la courbe la plus lisible.
+const FP_TI_COLORS={compare:'#898781', avg:'#7F77DD', cumul:'#1D9E75'};
 
 function removeWidget(id){
   widgets=widgets.filter(w=>w.id!==id);
@@ -4520,7 +5036,7 @@ function renderZoomBody(w, containerId){
     el.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;padding:20px">
       <svg width="320" height="180" viewBox="0 0 320 180">
         <path d="M28,158 A125,125 0 0,1 272,158" fill="none" stroke="#eef2f7" stroke-width="22" stroke-linecap="round"/>
-        <path d="M28,158 A125,125 0 0,1 272,158" fill="none" stroke="${color}" stroke-width="22" stroke-linecap="round"
+        <path d="M28,158 A125,125 0 0,1 272,158" fill="none" stroke="${safeColor(color)}" stroke-width="22" stroke-linecap="round"
           stroke-dasharray="${pct*392} 392"/>
         <circle cx="${tx}" cy="${ty}" r="9" fill="${isOk?'#1D9E75':'#D85A30'}" stroke="#fff" stroke-width="3"/>
         <line x1="150" y1="155" x2="${nx}" y2="${ny}" stroke="#1a2733" stroke-width="4" stroke-linecap="round"/>
@@ -4846,7 +5362,7 @@ function refreshPreview(){
             </div>
             <div style="display:flex;align-items:center;gap:6px">
               ${hasCmp?`<span style="font-size:9px;font-weight:700;background:var(--navy);color:rgba(255,255,255,.7);border-radius:5px;padding:2px 7px">⚖ comparé</span>`:''}
-              <div style="width:8px;height:8px;border-radius:99px;background:${w.color||appAccent};opacity:.7;flex-shrink:0"></div>
+              <div style="width:8px;height:8px;border-radius:99px;background:${safeColor(w.color||appAccent)};opacity:.7;flex-shrink:0"></div>
             </div>
           </div>
           <div class="wc-body" id="wb-${w.id}-p" style="${w.height?'height:calc('+w.height+'px - 52px);overflow:auto':''}"></div>
@@ -5348,179 +5864,23 @@ function agentBuildFull(){
 
 
 // ── OPENAI GPT-4o-mini INTEGRATION ────────────────────────────────────────
-// Clé OpenAI stockée en localStorage (jamais dans le code)
-function getOpenAIKey(){
-  const pid=fpAiActive();
-  return pid?(fpAiKeys()[pid]||''):'';
-}
-
-// ── Fournisseurs IA : registre, clés multiples, routeur, test de clé ─────
-const FP_AI_PROVIDERS={
-  anthropic:{label:'Claude (Anthropic)', short:'Claude',   host:'api.anthropic.com', url:'https://api.anthropic.com/v1/messages',        model:'claude-3-5-haiku-latest', hint:'sk-ant-…', doc:'console.anthropic.com'},
-  openai:   {label:'GPT-4o-mini (OpenAI)', short:'OpenAI', host:'api.openai.com',   url:'https://api.openai.com/v1/chat/completions',   model:'gpt-4o-mini',             hint:'sk-…',     doc:'platform.openai.com'},
-  mistral:  {label:'Mistral Small',        short:'Mistral',host:'api.mistral.ai',   url:'https://api.mistral.ai/v1/chat/completions',   model:'mistral-small-latest',    hint:'clé Mistral', doc:'console.mistral.ai'},
-  deepseek: {label:'DeepSeek Chat',        short:'DeepSeek',host:'api.deepseek.com',url:'https://api.deepseek.com/v1/chat/completions', model:'deepseek-chat',           hint:'sk-…',     doc:'platform.deepseek.com'},
-};
-window.FP_AI_PROVIDERS=FP_AI_PROVIDERS;
-function fpAiCustom(){ try{ return JSON.parse(localStorage.getItem('fp_ai_custom')||'{}'); }catch(e){ return {}; } }
-function fpAiProviders(){ return Object.assign({}, FP_AI_PROVIDERS, fpAiCustom()); }
-window.fpAiProviders=fpAiProviders;
-function fpAiAddCustom(label, baseUrl, model){
-  const id='c_'+label.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,24);
-  let host=''; try{ host=new URL(baseUrl).host; }catch(e){ host=baseUrl; }
-  const url=baseUrl.replace(/\/+$/,'')+'/chat/completions';
-  const m=fpAiCustom();
-  m[id]={label:label, short:label, host:host, url:url, model:model, hint:'clé API', custom:true};
-  try{ localStorage.setItem('fp_ai_custom',JSON.stringify(m)); }catch(e){}
-  return id;
-}
-function fpAiRemoveKey(pid){
-  fpAiSetKey(pid,'');
-  const m=fpAiCustom();
-  if(m[pid]){ delete m[pid]; try{ localStorage.setItem('fp_ai_custom',JSON.stringify(m)); }catch(e){} }
-  if(localStorage.getItem('fp_ai_provider')===pid) localStorage.removeItem('fp_ai_provider');
-}
-function fpAiKeys(){ try{ return JSON.parse(localStorage.getItem('fp_ai_keys')||'{}'); }catch(e){ return {}; } }
-function fpAiSetKey(pid,key){
-  const m=fpAiKeys();
-  if(key) m[pid]=key.trim(); else delete m[pid];
-  try{ localStorage.setItem('fp_ai_keys',JSON.stringify(m)); }catch(e){}
-  if(key&&!fpAiActive()) fpAiSetActive(pid);
-}
-function fpAiSetActive(pid){ try{ localStorage.setItem('fp_ai_provider',pid); }catch(e){} }
-function fpAiActive(){
-  const m=fpAiKeys();
-  const P=fpAiProviders();
-  const pref=localStorage.getItem('fp_ai_provider');
-  if(pref&&m[pref]&&P[pref]) return pref;
-  const first=Object.keys(P).find(p=>m[p]);
-  return first||null;
-}
-// Migration de l'ancienne clé unique (flowpilot_openai_key)
-(function(){
-  const legacy=localStorage.getItem('flowpilot_openai_key');
-  if(legacy&&!Object.keys(fpAiKeys()).length){
-    const pid=legacy.indexOf('sk-ant-')===0?'anthropic':'openai';
-    fpAiSetKey(pid,legacy); fpAiSetActive(pid);
-  }
+// ── Aucune IA distante ───────────────────────────────────────────────────
+// Les fournisseurs externes, les clés API et le routeur de requêtes ont été
+// retirés : FlowPilot n'émet plus aucune requête vers un service tiers. Toute
+// l'assistance est locale (moteur de règles + widgets/recommend.js), ce qui
+// garantit que les données de l'utilisateur ne quittent jamais son navigateur.
+// Nettoyage des clés éventuellement laissées par les versions précédentes.
+(function purgeLegacyAiKeys(){
+  ['fp_ai_keys','fp_ai_provider','fp_ai_custom','fp_ai_last_status','fp_ai_sharing','flowpilot_openai_key']
+    .forEach(k=>{ try{ localStorage.removeItem(k); }catch(e){} });
 })();
-function fpAiProviderInfo(){
-  const pid=fpAiActive()||'openai';
-  return Object.assign({id:pid},fpAiProviders()[pid]||FP_AI_PROVIDERS.openai);
-}
-window.fpAiProviderInfo=fpAiProviderInfo;
 
-async function fpAiRequest(pid,key,messages,opts){
-  opts=opts||{};
-  const P=fpAiProviders()[pid];
-  if(!P) throw new Error('Fournisseur inconnu.');
-  let resp;
-  try{
-    if(pid==='anthropic'){
-      const sys=messages.filter(m=>m.role==='system').map(m=>m.content).join('\n\n');
-      const rest=messages.filter(m=>m.role!=='system');
-      const body={model:P.model, max_tokens:opts.maxTokens||600,
-        messages:rest.length?rest:[{role:'user',content:sys||'Bonjour'}]};
-      if(sys&&rest.length) body.system=sys;
-      if(opts.temperature!=null) body.temperature=opts.temperature;
-      resp=await fetch(P.url,{method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':key,
-          'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify(body)});
-    } else {
-      const body={model:P.model, max_tokens:opts.maxTokens||600, messages:messages};
-      if(opts.temperature!=null) body.temperature=opts.temperature;
-      if(opts.json) body.response_format={type:'json_object'};
-      resp=await fetch(P.url,{method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-        body:JSON.stringify(body)});
-    }
-  }catch(netErr){
-    throw new Error('Impossible de joindre '+P.host+' — réseau, pare-feu ou extension qui bloque ce domaine. Essaie un autre fournisseur dans Réglages → IA.');
-  }
-  const data=await resp.json().catch(()=>({}));
-  if(!resp.ok){
-    if(resp.status===401||resp.status===403) throw new Error('Clé API invalide ou expirée ('+P.label+').');
-    throw new Error((data&&data.error&&data.error.message)||('HTTP '+resp.status));
-  }
-  if(pid==='anthropic') return (data.content&&data.content[0]&&data.content[0].text)||'';
-  return (data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content)||'';
-}
-
-async function fpAiChat(messages, opts){
-  const pid=fpAiActive();
-  if(!pid) throw new Error('Aucune clé API configurée (Réglages → IA).');
-  return fpAiRequest(pid,fpAiKeys()[pid],messages,opts);
-}
-window.fpAiChat=fpAiChat;
-
-// Test d'une clé auprès du fournisseur (mini requête) — utilisé par Réglages
-async function fpAiTestKey(pid,key){
-  try{
-    await fpAiRequest(pid,key,[{role:'user',content:'ping'}],{maxTokens:1});
-    return {ok:true, message:'Clé valide — '+(fpAiProviders()[pid]||{}).model};
-  }catch(e){
-    return {ok:false, message:e.message};
-  }
-}
-window.fpAiTestKey=fpAiTestKey;
-
-function setOpenAIKey(k){
-  if(k && k.startsWith('sk-')){
-    const pid=k.indexOf('sk-ant-')===0?'anthropic':'openai';
-    fpAiSetKey(pid,k); fpAiSetActive(pid);
-    return true;
-  }
-  return false;
-}
-
-function showKeyPrompt(onSuccess){
-  const feed = document.getElementById('ai-chat-feed') || document.getElementById('agent-feed');
-  if(!feed) return;
-  const id = 'kf'+Date.now();
-  feed.insertAdjacentHTML('beforeend', `
-    <div class="ai-chat-msg" id="${id}">
-      <div class="ai-chat-avatar ai">🔑</div>
-      <div class="ai-chat-bubble">
-        <div style="font-weight:800;margin-bottom:6px">Connexion IA requise</div>
-        <div style="font-size:12px;color:var(--mid);margin-bottom:10px">Renseignez votre clé OpenAI (sk-…) ou Claude/Anthropic (sk-ant-…) — sauvegardée dans votre navigateur.</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="ki_${id}" type="password" placeholder="sk-..." style="flex:1;border:1px solid var(--border);border-radius:8px;padding:8px 11px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none"/>
-          <button style="background:var(--accent);color:var(--navy);border:none;border-radius:8px;padding:8px 14px;font-weight:800;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif" id="kb_${id}">Enregistrer</button>
-        </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:7px">🔒 Stockée uniquement dans votre navigateur — transmise uniquement au fournisseur de la clé (OpenAI ou Anthropic).</div>
-      </div>
-    </div>`);
-  feed.scrollTop = feed.scrollHeight;
-  
-  const inputEl = document.getElementById('ki_'+id);
-  const btnEl   = document.getElementById('kb_'+id);
-  
-  if(inputEl) setTimeout(()=>inputEl.focus(), 100);
-  
-  if(btnEl) btnEl.addEventListener('click', function(){
-    const val = (inputEl ? inputEl.value : '').trim();
-    if(setOpenAIKey(val)){
-      const bubble = document.getElementById(id)?.querySelector('.ai-chat-bubble');
-      if(bubble) bubble.innerHTML='<span style="color:var(--green);font-weight:800">✓ Clé enregistrée — posez à nouveau votre question.</span>';
-    } else {
-      if(inputEl) inputEl.style.borderColor='var(--coral)';
-    }
-  });
-  
-  if(inputEl) inputEl.addEventListener('keydown', function(e){
-    if(e.key==='Enter') btnEl && btnEl.click();
-  });
-}
 
 function agentTextareaResize(el){
   el.style.height='auto';
   el.style.height=Math.min(el.scrollHeight,100)+'px';
 }
 
-function agentInputKeydown(e){
-  if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); agentSendToOpenAI(); }
-}
 
 function agentUserSay(text){
   const feed=document.getElementById('agent-feed');
@@ -5528,126 +5888,7 @@ function agentUserSay(text){
   feed.scrollTop=feed.scrollHeight;
 }
 
-function buildDataContext(){
-  const nums=numericCols(), texts=textCols(), dates=dateCols();
-  const today=new Date();
-  const todayMs=today.getTime();
 
-  // Stats colonnes numériques
-  const numStats=nums.slice(0,5).map(c=>{
-    const vals=rows.map(r=>parseFloat(String(r[c.name]??'').replace(',','.'))).filter(v=>!isNaN(v));
-    if(!vals.length) return null;
-    const sum=vals.reduce((s,v)=>s+v,0);
-    return `${c.name}: total=${Math.round(sum)}, moy=${Math.round(sum/vals.length)}, min=${Math.min(...vals)}, max=${Math.max(...vals)}`;
-  }).filter(Boolean);
-
-  // Stats colonnes texte
-  const textSamples=texts.slice(0,3).map(c=>{
-    const uniq=[...new Set(rows.map(r=>r[c.name]).filter(Boolean))].slice(0,8);
-    return `${c.name}: [${uniq.join(', ')}]`;
-  });
-
-  // Stats colonnes date — CALCULS PRÉ-FAITS côté JS pour que l'IA n'ait pas à deviner
-  const dateStats=dates.map(c=>{
-    const parsed=rows.map(r=>parseDateValue(r[c.name])).filter(Boolean);
-    if(!parsed.length) return `${c.name}: aucune valeur parseable`;
-
-    const ms=parsed.map(d=>d.getTime()).sort((a,b)=>a-b);
-    const minD=new Date(ms[0]), maxD=new Date(ms[ms.length-1]);
-    const fmt=d=>d.toLocaleDateString('fr-FR');
-
-    // Détecter si c'est une date passée (naissance, embauche...) → calculer âge/ancienneté
-    const avgMs=ms.reduce((s,v)=>s+v,0)/ms.length;
-    const avgAgeYears=Math.round((todayMs-avgMs)/(365.25*24*3600*1000)*10)/10;
-    const minAgeYears=Math.round((todayMs-ms[ms.length-1])/(365.25*24*3600*1000)*10)/10;
-    const maxAgeYears=Math.round((todayMs-ms[0])/(365.25*24*3600*1000)*10)/10;
-
-    const isHistorical=maxD<=today; // toutes les dates sont dans le passé
-    const isFuture=minD>today;
-
-    let info=`${c.name}: ${parsed.length} valeurs, plage=${fmt(minD)} → ${fmt(maxD)}`;
-    if(isHistorical && avgAgeYears>0 && avgAgeYears<120){
-      info+=`, âge/ancienneté moyen(ne)=${avgAgeYears} ans (min=${minAgeYears} ans, max=${maxAgeYears} ans)`;
-      info+=`. IMPORTANT: pour calculer l'âge depuis cette colonne, utilise les valeurs déjà calculées ci-dessus — la date du jour est ${fmt(today)}.`;
-    } else if(isFuture){
-      info+=` (dates futures — délais, échéances)`;
-    } else {
-      info+=` (dates mixtes passé/futur)`;
-    }
-    return info;
-  });
-
-  const widgetSummary=widgets.map(w=>`${w.type}(${w.title||''})`).join(', ');
-
-  return `Tu es un assistant analyste de données BI intégré dans FlowPilot Studio.
-Date du jour (RÉFÉRENCE ABSOLUE) : ${today.toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'})} — utilise TOUJOURS cette date pour tout calcul d'âge ou d'ancienneté.
-Données chargées : ${rows.length} lignes, ${columns.length} colonnes.
-Colonnes numériques (${nums.length}): ${nums.map(c=>c.name).join(', ')}.
-Colonnes texte (${texts.length}): ${texts.map(c=>c.name).join(', ')}.
-Colonnes date (${dates.length}) avec statistiques pré-calculées :
-${dateStats.map(s=>'  - '+s).join('\n')}
-Statistiques numériques clés: ${numStats.join(' | ')}.
-Valeurs exemples texte: ${textSamples.join(' | ')}.
-Widgets actuels: ${widgetSummary||'aucun'}.
-RÈGLE CRITIQUE : Pour toute question sur les âges, anciennetés ou durées depuis une colonne date, utilise les valeurs déjà calculées ci-dessus. Ne renvoie jamais 0 ou une valeur inventée — base-toi uniquement sur les chiffres fournis.
-AGRÉGATION SPÉCIALE : L'agrégation "age" est disponible dans les widgets pour calculer l'âge moyen depuis une date (ex: aggr="age" sur col2="DATE NAISSANCE").
-Réponds de façon concise, en français, avec des insights actionnables.`;
-}
-
-async function agentSendToOpenAI(){
-  const ta=document.getElementById('agent-textarea');
-  const btn=document.getElementById('agent-send-btn');
-  const text=ta.value.trim();
-  if(!text) return;
-
-  // Afficher le message utilisateur
-  agentUserSay(text);
-  ta.value=''; ta.style.height='auto';
-  btn.disabled=true;
-
-  // Vérifier la clé OpenAI
-  if(!getOpenAIKey()){
-    showKeyPrompt(null);
-    document.getElementById('agent-send-btn').disabled=false;
-    return;
-  }
-
-  // Typing indicator
-  const feed=document.getElementById('agent-feed');
-  const tid='typing-ai-'+Date.now();
-  feed.insertAdjacentHTML('beforeend',`<div class="agent-msg" id="${tid}"><div class="agent-msg-avatar">✨</div><div class="agent-bubble"><div class="agent-typing"><span></span><span></span><span></span></div></div></div>`);
-  feed.scrollTop=feed.scrollHeight;
-
-  try {
-    const systemPrompt=rows.length>0 ? buildDataContext() : 'Tu es un assistant BI expert dans FlowPilot Studio. Réponds en français de façon concise.';
-
-    const reply=(await fpAiChat([
-      {role:'system', content:systemPrompt},
-      {role:'user', content:text}
-    ],{maxTokens:600}))||'Pas de réponse reçue.';
-
-    // Remplacer le typing indicator
-    const el=document.getElementById(tid);
-    if(el){
-      // Convertir les sauts de ligne en <br> et le **gras**
-      const html=reply
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
-        .replace(/\n/g,'<br>');
-      el.querySelector('.agent-bubble').innerHTML=`<span style="font-size:10px;color:var(--muted);font-weight:700;display:block;margin-bottom:4px">✨ ${fpAiProviderInfo().label}</span>${html}`;
-    }
-
-    // Mettre à jour le statut
-    const statusLine=document.getElementById('agent-status-line');
-    if(statusLine) statusLine.innerHTML=`<span class="as-dot-ai"></span>IA connectée · ${fpAiProviderInfo().label}`;
-
-  } catch(err){
-    const el=document.getElementById(tid);
-    if(el) el.querySelector('.agent-bubble').innerHTML=`<span style="color:var(--coral)">❌ Erreur : ${esc(err.message)}</span>`;
-  } finally {
-    btn.disabled=false;
-  }
-}
 
 // ── EXPORT ────────────────────────────────────────────────────────────────
 
@@ -6033,6 +6274,127 @@ function openTuning(wid){
   }
 
   // ── Objectif ─────────────────────────────────────────────────────────
+  // ── Portée temporelle du widget ──────────────────────────────────────
+  {
+    const dateCols=(Array.isArray(columns)?columns:[]).filter(c=>c.type==='date');
+    if(dateCols.length){
+      const cur=(w.period&&w.period.preset)||'all';
+      const curCol=fpPeriodCol(w)||dateCols[0].name;
+      const perHtml=
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:5px">Période affichée</div>'
+        +'<select id="tn-per-preset" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:inherit"'
+        +' onchange="document.getElementById(\'tn-per-custom\').style.display=this.value===\'custom\'?\'\':\'none\'">'
+        + FP_PERIOD_PRESETS.map(p=>'<option value="'+p.id+'"'+(cur===p.id?' selected':'')+'>'+esc(p.label)+'</option>').join('')
+        +'</select>'
+        +'<div id="tn-per-custom" style="display:'+(cur==='custom'?'':'none')+';gap:6px;margin-top:7px">'
+        +'<div style="display:flex;gap:6px;align-items:center">'
+        +'<input id="tn-per-from" type="date" value="'+esc((w.period&&w.period.from)||'')+'" style="flex:1;font-size:12px;padding:5px 7px;border:1px solid var(--border);border-radius:8px;font-family:inherit"/>'
+        +'<span style="font-size:11px;color:var(--muted)">→</span>'
+        +'<input id="tn-per-to" type="date" value="'+esc((w.period&&w.period.to)||'')+'" style="flex:1;font-size:12px;padding:5px 7px;border:1px solid var(--border);border-radius:8px;font-family:inherit"/>'
+        +'</div></div>'
+        +(dateCols.length>1
+          ? '<div style="font-size:11px;color:var(--muted);margin:10px 0 5px">Sur quelle colonne de date</div>'
+            +'<select id="tn-per-col" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:inherit">'
+            + dateCols.map(c=>'<option value="'+esc(c.name)+'"'+(curCol===c.name?' selected':'')+'>'+esc(colLabel(c.name))+'</option>').join('')
+            +'</select>'
+          : '')
+        +'<div style="font-size:10px;color:var(--mid);margin-top:7px;line-height:1.4">Chaque widget a sa propre période : « le CA de ce mois » peut voisiner avec « l\'évolution sur 12 mois ». À l\'export, la période est figée en dates absolues.</div>';
+      section('Période', perHtml);
+    }
+  }
+
+  // ── Exploration : que fait un clic sur le graphique ? ────────────────
+  if(['bar','line','donut','geo'].includes(w.type)){
+    const dm=w.drillMode||'filter';
+    const isDateCol=(columns.find(c=>c.name===w.col)||{}).type==='date';
+    const chosen=Array.isArray(w.drillCols)?w.drillCols:[];
+    const dimCols=(Array.isArray(columns)?columns:[])
+      .filter(c=>c.type!=='number'&&c.name!==w.col);
+    const opt=(v,l,cur)=>'<option value="'+esc(v)+'"'+(cur===v?' selected':'')+'>'+esc(l)+'</option>';
+
+    const hierHtml = isDateCol
+      ? '<div style="font-size:10.5px;color:var(--mid);line-height:1.45;background:var(--card2);border-radius:8px;padding:8px 10px">'
+        +'Colonne de type date : la hiérarchie est automatique — <strong>année ▸ trimestre ▸ mois ▸ jour</strong>. '
+        +'Chaque clic descend d\'un cran, le fil d\'Ariane permet de remonter.</div>'
+      : '<div style="font-size:11px;color:var(--muted);margin-bottom:5px">Niveaux suivants, dans l\'ordre</div>'
+        +[0,1,2].map(i=>
+          '<select id="tn-drill-'+i+'" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);'
+          +'border-radius:8px;background:var(--card);font-family:inherit;margin-bottom:5px">'
+          +opt('','— Aucun —',chosen[i]||'')
+          +dimCols.map(c=>opt(c.name, colLabel(c.name), chosen[i]||'')).join('')
+          +'</select>').join('')
+        +'<div style="font-size:10px;color:var(--mid);line-height:1.4">Exemple transport : <em>Transporteur ▸ Client ▸ Ville livraison</em>.</div>';
+
+    const drillHtml =
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:5px">Au clic sur le graphique</div>'
+      +'<label style="display:flex;gap:8px;align-items:flex-start;padding:5px 7px;border-radius:8px;cursor:pointer;'
+      +(dm==='filter'?'background:var(--accent-soft);border:1px solid var(--accent)':'border:1px solid transparent')+'">'
+      +'<input type="radio" name="tn-drillmode" value="filter"'+(dm==='filter'?' checked':'')+' style="accent-color:var(--accent);margin-top:2px"/>'
+      +'<span><span style="display:block;font-size:12px;font-weight:700;color:var(--dark)">Filtrer les autres widgets</span>'
+      +'<span style="display:block;font-size:10px;color:var(--mid)">Le comportement actuel : le clic croise les widgets entre eux.</span></span></label>'
+      +'<label style="display:flex;gap:8px;align-items:flex-start;padding:5px 7px;border-radius:8px;cursor:pointer;'
+      +(dm==='drill'?'background:var(--accent-soft);border:1px solid var(--accent)':'border:1px solid transparent')+'">'
+      +'<input type="radio" name="tn-drillmode" value="drill"'+(dm==='drill'?' checked':'')+' style="accent-color:var(--accent);margin-top:2px"/>'
+      +'<span><span style="display:block;font-size:12px;font-weight:700;color:var(--dark)">Descendre d\'un niveau</span>'
+      +'<span style="display:block;font-size:10px;color:var(--mid)">Le clic détaille ce point. Alt+clic filtre quand même les autres widgets.</span></span></label>'
+      +'<div style="margin-top:10px">'+hierHtml+'</div>';
+    section('Exploration au clic', drillHtml);
+  }
+
+  // ── Analyse temporelle : comparaison, cumul, lissage ─────────────────
+  const tiDateCol = (isLine && w.col && (columns.find(c=>c.name===w.col)||{}).type==='date') ? w.col : null;
+  if(tiDateCol){
+    const grainLbl={day:'jour',week:'semaine',month:'mois',quarter:'trimestre',year:'année'}[fpGrainOf(tiDateCol)]||'période';
+    const cmp=w.compareMode||'none', cum=w.cumulMode||'none', mav=parseInt(w.movingAvg,10)||0;
+    const radio=(name,val,cur,label,desc)=>
+      '<label style="display:flex;gap:8px;align-items:flex-start;padding:5px 7px;border-radius:8px;cursor:pointer;'
+      +(cur===val?'background:var(--accent-soft);border:1px solid var(--accent)':'border:1px solid transparent')+'">'
+      +'<input type="radio" name="'+name+'" value="'+val+'"'+(cur===val?' checked':'')+' style="accent-color:var(--accent);margin-top:2px"/>'
+      +'<span><span style="display:block;font-size:12px;font-weight:700;color:var(--dark)">'+label+'</span>'
+      +(desc?'<span style="display:block;font-size:10px;color:var(--mid);line-height:1.35">'+desc+'</span>':'')
+      +'</span></label>';
+
+    const tiHtml =
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Granularité actuelle : <strong>'+grainLbl+'</strong> — se règle sur la colonne, dans la liste de gauche.</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin:10px 0 4px">Courbe de comparaison</div>'
+      + radio('tn-ti-compare','none',cmp,'Aucune','')
+      + radio('tn-ti-compare','prev',cmp,'Période précédente','Chaque point comparé au '+grainLbl+' d\'avant.')
+      + radio('tn-ti-compare','yoy',cmp,"Même période l'an dernier",'Mars 2026 face à mars 2025 — la comparaison de gestion.')
+      +'<div style="font-size:11px;color:var(--muted);margin:12px 0 4px">Cumul</div>'
+      +'<select id="tn-ti-cumul" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:inherit">'
+      + [['none','— Aucun —'],['ytd','Cumul annuel (repart au 1er janvier)'],['qtd','Cumul trimestriel'],['mtd','Cumul mensuel'],['running','Cumul total depuis le début']]
+          .map(([v,l])=>'<option value="'+v+'"'+(cum===v?' selected':'')+'>'+l+'</option>').join('')
+      +'</select>'
+      +'<div style="font-size:11px;color:var(--muted);margin:12px 0 4px">Moyenne mobile</div>'
+      +'<div style="display:flex;gap:8px;align-items:center">'
+      +'<input id="tn-ti-mavg" type="number" min="0" max="24" step="1" value="'+(mav||'')+'" placeholder="0"'
+      +' style="width:70px;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit"/>'
+      +'<span style="font-size:11px;color:var(--muted)">'+grainLbl+'s — lisse les à-coups. 0 pour désactiver.</span>'
+      +'</div>';
+    section('Analyse temporelle', tiHtml);
+  }
+
+  // ── KPI : variation vs période précédente ou N-1 ─────────────────────
+  if(w.type==='kpi'){
+    const dateCols=(Array.isArray(columns)?columns:[]).filter(c=>c.type==='date');
+    if(dateCols.length){
+      const cur=w.kpiCompareMode||'none';
+      const curCol=w.kpiCompareDate||dateCols[0].name;
+      const kpiHtml =
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Colonne de date de référence</div>'
+        +'<select id="tn-kpi-cmpdate" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:inherit;margin-bottom:10px">'
+        + dateCols.map(c=>'<option value="'+esc(c.name)+'"'+(curCol===c.name?' selected':'')+'>'+esc(colLabel(c.name))+'</option>').join('')
+        +'</select>'
+        +'<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Comparer la dernière période à</div>'
+        +'<select id="tn-kpi-cmpmode" style="width:100%;font-size:12px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);font-family:inherit">'
+        + [['none','— Aucune comparaison —'],['prev','La période précédente'],['yoy',"La même période l'an dernier"]]
+            .map(([v,l])=>'<option value="'+v+'"'+(cur===v?' selected':'')+'>'+l+'</option>').join('')
+        +'</select>'
+        +'<div style="font-size:10px;color:var(--mid);margin-top:6px;line-height:1.4">Si la dernière période n\'est pas terminée, un ⚠ le signale : comparer un mois en cours à un mois complet fausse la lecture.</div>';
+      section('Comparaison dans le temps', kpiHtml);
+    }
+  }
+
   if(isBar || isLine){
     const objHtml =
       '<div style="display:flex;flex-direction:column;gap:8px">'
@@ -6127,6 +6489,49 @@ function applyTuning(){
   widgets[idx].barGoal     = parseFloat(get('tn-goal')?.value)||null;
   widgets[idx].barGoalMax  = parseFloat(get('tn-goalmax')?.value)||null;
   widgets[idx].barGoalLabel = get('tn-goallbl')?.value || '';
+
+  // Portée temporelle
+  const perSel=get('tn-per-preset');
+  if(perSel){
+    const preset=perSel.value||'all';
+    if(preset==='all') delete widgets[idx].period;
+    else widgets[idx].period={
+      preset,
+      col:get('tn-per-col')?.value||fpPeriodCol(widgets[idx])||null,
+      from:preset==='custom'?(get('tn-per-from')?.value||''):'',
+      to:  preset==='custom'?(get('tn-per-to')?.value||''):''
+    };
+  }
+
+  // Exploration au clic
+  const dMode=document.querySelector('input[name="tn-drillmode"]:checked');
+  if(dMode){
+    const prevMode=widgets[idx].drillMode||'filter';
+    widgets[idx].drillMode=dMode.value;
+    // Changer de mode remet l'exploration à zéro : sinon le widget resterait
+    // descendu dans une hiérarchie qu'on vient de désactiver.
+    if(prevMode!==dMode.value) widgets[idx].drill=[];
+  }
+  if(get('tn-drill-0')){
+    const lv=[0,1,2].map(i=>get('tn-drill-'+i)?.value||'').filter(Boolean);
+    const uniq=[...new Set(lv)].filter(n=>n!==widgets[idx].col);
+    widgets[idx].drillCols=uniq;
+    if(fpDrillStack(widgets[idx]).length>uniq.length) widgets[idx].drill=[];
+  }
+
+  // Analyse temporelle
+  const tiCmp=document.querySelector('input[name="tn-ti-compare"]:checked');
+  if(tiCmp) widgets[idx].compareMode = tiCmp.value;
+  const tiCum=get('tn-ti-cumul');
+  if(tiCum) widgets[idx].cumulMode = tiCum.value;
+  const tiMav=get('tn-ti-mavg');
+  if(tiMav) widgets[idx].movingAvg = Math.max(0, Math.min(24, parseInt(tiMav.value,10)||0));
+
+  // KPI : comparaison dans le temps
+  const kCmp=get('tn-kpi-cmpmode');
+  if(kCmp) widgets[idx].kpiCompareMode = kCmp.value;
+  const kDate=get('tn-kpi-cmpdate');
+  if(kDate) widgets[idx].kpiCompareDate = kDate.value || null;
 
   if(widgets[idx].type==='geo'){
     widgets[idx].color     = get('tn-geo-color')?.value || widgets[idx].color;
@@ -6269,20 +6674,6 @@ function setDateFmtInline(el){
 }
 
 // ── POPUP ANALYSTE IA ─────────────────────────────────────────────────────
-function openAnalystPopup(){
-  if(typeof window.FP_initAnalyst === 'function'){
-    window.FP_initAnalyst({
-      getWidgets:      function(){ return widgets; },
-      getFilteredRows: function(){ return filteredRows; },
-      getRows:         function(){ return rows; },
-      fmtNum:          fmtNum,
-      getOpenAIKey:    function(){ return sessionStorage.getItem('fp_openai_key')||''; }
-    });
-    if(typeof window.__fpAnalystOpen === 'function') window.__fpAnalystOpen();
-  } else {
-    toast(window.FP_t?window.FP_t('toast_ai_module_loading'):'Module IA en cours de chargement, réessayez dans un instant');
-  }
-}
 
 // ── BAR-COMPARE CONTROLLERS ──────────────────────────────────────────────
 const SERIES_COLORS_BC=['#4a7fa5','#EF9F27','#1D9E75','#D85A30','#7F77DD','#85BC25'];
@@ -6456,6 +6847,11 @@ async function captureScreenshot(){
 }
 
 function exportHTML(){
+  // Toute la génération partage la même date de référence.
+  _fpFrozenToday=new Date();
+  try{ return exportHTMLInner(); } finally { _fpFrozenToday=null; }
+}
+function exportHTMLInner(){
   const name=document.getElementById('app-name')?.value||'Mon Analyse';
   const safeRows=rows;
   const html=buildExportHTML(name,safeRows,widgets,columns,colAliases,colDateFormats,appAccent,COLORS,AGGR_TYPES,CHART_TYPES);
@@ -6465,6 +6861,39 @@ function exportHTML(){
   a.href=url; a.download=(name.replace(/\s+/g,'_')||'FlowPilot')+'_dashboard.html';
   a.click(); URL.revokeObjectURL(url);
   toast(window.FP_t?window.FP_t('toast_html_export_generated'):'⬇ Export HTML généré !');
+}
+
+// Le dashboard exporté est statique : il affiche, il ne recalcule pas. On y
+// embarque donc la time intelligence DÉJÀ calculée, plutôt que d'y dupliquer
+// le moteur — c'est aussi ce qui évite d'alourdir encore l'export.
+function fpWidgetsForExport(){
+  const today=fpToday();
+  const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  return widgets.map(w=>{
+    const c={...w};
+    delete c.drill; delete c.__keyByLabel;   // l'export rend le niveau haut, pas l'exploration en cours
+    // Les presets sont FIGÉS en dates absolues : un dashboard exporté en juin
+    // doit montrer juin, même ouvert en décembre.
+    if(w.period&&w.period.preset&&w.period.preset!=='all'&&w.period.preset!=='custom'){
+      const r=fpResolvePeriod(w.period, today);
+      if(r) c.period={preset:'custom', col:fpPeriodCol(w),
+                      from:r.from?iso(r.from):'',
+                      to:r.to?iso(new Date(r.to.getTime()-86400000)):''};
+    }
+    try{
+      if(w.type==='line'){
+        const ti=fpBuildTimeIntel(w,12);
+        if(ti) c._ti={labels:ti.labels,base:ti.base,compare:ti.compare,cumul:ti.cumul,
+                      movingAvg:ti.movingAvg,compareLabel:ti.compareLabel,
+                      cumulLabel:ti.cumulLabel,movingAvgLabel:ti.movingAvgLabel,
+                      measureLabel:colLabel(w.col2)||'Valeur'};
+      } else if(w.type==='kpi'){
+        const cmp=fpKpiCompare(w);
+        if(cmp) c._kpiCmp=cmp;
+      }
+    }catch(e){}
+    return c;
+  });
 }
 
 function buildExportHTML(name,safeRows,widgets,columns,colAliases,colDateFormats,accent,COLORS,AGGR_TYPES,CHART_TYPES){
@@ -6536,8 +6965,21 @@ tr:nth-child(even) td{background:var(--card2)}
   <div class="grid" id="grid"></div>
 </div>
 <script>
-const rows=${JSON.stringify(safeRows)};
-const widgets=${JSON.stringify(widgets)};
+let rows=${JSON.stringify(safeRows)};
+const __fpAllRows=rows;   // copie de référence : chaque widget repart de là
+${String(fpResolvePeriod)}
+${String(fpPeriodCol)}
+${String(fpPeriodRows)}
+function fpToday(){ return new Date(${JSON.stringify(fpToday().toISOString())}); }
+function __fpApplyScope(w){
+  // Le cache de l'export est indexé par la seule clé d'agrégation, sans
+  // l'identité du jeu de lignes (contrairement à l'app, qui préfixe par
+  // getRowsCacheId). Changer la portée sans le vider ferait relire au
+  // widget suivant le résultat calculé pour la période du précédent.
+  rows = fpPeriodRows(w, __fpAllRows, fpToday());
+  aggregationCache.clear();
+}
+const widgets=${JSON.stringify(fpWidgetsForExport())};
 const columns=${JSON.stringify(columns)};
 const colAliases=${JSON.stringify(colAliases)};
 const colDateFormats=${JSON.stringify(colDateFormats)};
@@ -6556,10 +6998,15 @@ if(window.Chart&&!Chart.registry.plugins.get('fpValueLabels'))Chart.register(fpV
 function colLabel(n){return colAliases[n]||n}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmt(n){if(Math.abs(n)>=1e6)return(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+'k';return Number.isInteger(n)?String(n):parseFloat(n.toFixed(2)).toString()}
-function parseDateValue(v){if(v===null||v===undefined||v==='')return null;if(v instanceof Date&&!isNaN(v))return v;if(typeof v==='number'&&Number.isFinite(v)){if(v>=20000&&v<=80000){const d=new Date(Math.round((v-25569)*86400*1000));return isNaN(d)?null:d}return null}const s=String(v).trim();let m=s.match(/^(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);if(m){const d=new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0));if(d.getFullYear()==+m[1]&&d.getMonth()==+m[2]-1&&d.getDate()==+m[3])return d}m=s.match(/^(\d{1,2})[-\/\.](\d{1,2})[-\/\.](\d{2}|\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);if(m){const year=String(m[3]).length===2?2000+(+m[3]):+m[3];const d=new Date(year,+m[2]-1,+m[1],+(m[4]||0),+(m[5]||0),+(m[6]||0));if(d.getFullYear()===year&&d.getMonth()==+m[2]-1&&d.getDate()==+m[1])return d}return null}
-function aggregate(values,aggr){const clean=values.filter(v=>v!==''&&v!=null);if(aggr==='count')return clean.length;if(aggr==='countd')return[...new Set(clean.map(v=>String(v)))].length;const nums=clean.map(v=>parseFloat(String(v??0).replace(/\s/g,'').replace(',','.'))).filter(v=>!isNaN(v));if(!nums.length)return 0;if(aggr==='sum')return nums.reduce((s,v)=>s+v,0);if(aggr==='avg')return nums.reduce((s,v)=>s+v,0)/nums.length;if(aggr==='min')return Math.min(...nums);if(aggr==='max')return Math.max(...nums);if(aggr==='std'){const m=nums.reduce((s,v)=>s+v,0)/nums.length;return Math.sqrt(nums.reduce((s,v)=>s+(v-m)**2,0)/nums.length)}if(aggr==='median'){const s=[...nums].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2}return nums.reduce((s,v)=>s+v,0)}
+${String(FP_MINUTE_MS_SRC)}
+${String(fpNormalizeDate)}
+${String(parseDateValue)}
+function aggregate(values,aggr){const clean=values.filter(v=>v!==''&&v!=null);if(aggr==='count')return clean.length;if(aggr==='countd')return[...new Set(clean.map(v=>String(v)))].length;const nums=clean.map(v=>parseFloat(String(v??0).replace(/\\s/g,'').replace(',','.'))).filter(v=>!isNaN(v));if(!nums.length)return 0;if(aggr==='sum')return nums.reduce((s,v)=>s+v,0);if(aggr==='avg')return nums.reduce((s,v)=>s+v,0)/nums.length;if(aggr==='min')return Math.min(...nums);if(aggr==='max')return Math.max(...nums);if(aggr==='std'){const m=nums.reduce((s,v)=>s+v,0)/nums.length;return Math.sqrt(nums.reduce((s,v)=>s+(v-m)**2,0)/nums.length)}if(aggr==='median'){const s=[...nums].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2}return nums.reduce((s,v)=>s+v,0)}
 function groupByDim(dc,vc,ag,lim){return cachedAggregation(['dim',dc,vc||'',ag||'',lim||10].join('§'),()=>{if(!vc||ag==='count'||ag==='countd'){const m={};rows.forEach(r=>{const k=String(r[dc]??'—').slice(0,30);if(!m[k])m[k]=[];m[k].push(r[vc]??r[dc])});return Object.entries(m).map(([k,v])=>[k,ag==='countd'?[...new Set(v)].length:v.length]).sort((a,b)=>b[1]-a[1]).slice(0,lim||10)}const m={};rows.forEach(r=>{const k=String(r[dc]??'—').slice(0,30);if(!m[k])m[k]=[];m[k].push(r[vc])});return Object.entries(m).map(([k,v])=>[k,aggregate(v,ag)]).sort((a,b)=>b[1]-a[1]).slice(0,lim||10)})}
-function groupByTime(dc,vc,ag,lim){const fmtId=colDateFormats[dc]||'month';return cachedAggregation(['time',dc,vc||'',ag||'',lim||12,fmtId].join('§'),()=>{const M=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];const m={};rows.forEach(r=>{const raw=r[dc];if(!raw)return;const d=parseDateValue(raw);if(!d)return;let k='';if(fmtId==='day')k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');else if(fmtId==='week'){const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));tmp.setUTCDate(tmp.getUTCDate()+4-(tmp.getUTCDay()||7));const yr=tmp.getUTCFullYear();const wk=Math.ceil((((tmp-new Date(Date.UTC(yr,0,1)))/86400000)+1)/7);k=yr+'-S'+String(wk).padStart(2,'0')}else if(fmtId==='month')k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');else if(fmtId==='quarter')k='T'+Math.ceil((d.getMonth()+1)/3)+' '+d.getFullYear();else k=String(d.getFullYear());if(!m[k])m[k]=[];m[k].push(vc?r[vc]:1)});const pretty=k=>{if(fmtId==='month'){const[yr,mo]=k.split('-');return M[parseInt(mo)-1]+' '+yr}return k};return Object.entries(m).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>[pretty(k),aggregate(v,vc?ag:'count')]).slice(0,lim||12)})}
+${String(FP_MONTHS_SHORT_SRC)}
+${String(fpPeriodKey)}
+${String(fpPeriodLabel)}
+function groupByTime(dc,vc,ag,lim){const fmtId=colDateFormats[dc]||'month';return cachedAggregation(['time',dc,vc||'',ag||'',lim||12,fmtId].join('§'),()=>{const m={};rows.forEach(r=>{const raw=r[dc];if(!raw)return;const d=parseDateValue(raw);if(!d)return;const k=fpPeriodKey(d,fmtId);if(!k)return;if(!m[k])m[k]=[];m[k].push(vc?r[vc]:1)});return Object.entries(m).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>[fpPeriodLabel(k,fmtId),aggregate(v,vc?ag:'count')]).slice(0,lim||12)})}
 function computeKPI(col,ag){return cachedAggregation(['kpi',col,ag||'sum'].join('§'),()=>aggregate(rows.map(r=>r[col]),ag||'sum'))}
 const ISO2_TO_NUM = {
   AD:"20",AE:"784",AF:"4",AG:"28",AI:"660",AL:"8",AM:"51",AO:"24",AQ:"10",AR:"32",
@@ -8307,7 +8754,7 @@ function renderGeoWidget(w,el,wi,labels,values,color){
 }
 // ── GEO-EXPORT-END
 
-function parseNumValue(v){const n=parseFloat(String(v??'').replace(/\s/g,'').replace(',','.'));return isNaN(n)?0:n}
+function parseNumValue(v){const n=parseFloat(String(v??'').replace(/\\s/g,'').replace(',','.'));return isNaN(n)?0:n}
 function isNumericColumn(colName){const c=columns.find(x=>x.name===colName);return c&&c.type==='number'}
 function isMeasureColumn(colName){return (fieldModels[colName]&&fieldModels[colName].role==='measure')||(!fieldModels[colName]&&isNumericColumn(colName))}
 var TABLE_AGGR_LABELS={count:'Nombre',sum:'Somme',avg:'Moyenne',min:'Min',max:'Max'};
@@ -8331,7 +8778,7 @@ widgets.forEach((w,wi)=>{
   grid.insertAdjacentHTML('beforeend',\`<div class="wc" style="--widget-span:\${span};\${hStyle}"><div class="wh"><div class="wt">\${esc(title)}</div>\${sub?'<div class="ws">'+esc(sub)+'</div>':''}</div><div class="wb" id="\${bid}" style="\${bStyle}"></div></div>\`);
   const el=document.getElementById(bid);
   const color=w.color||accent;
-  if(w.type==='kpi'){const val=w.kpiCol?computeKPI(w.kpiCol,w.aggrKpi||'sum'):0;const ag=AGGR_TYPES.find(a=>a.id===(w.aggrKpi||'sum'));el.innerHTML='<div class="kpi-val">'+fmt(val)+'</div><div class="kpi-sub">'+(ag?ag.label:'')+' — '+esc(colLabel(w.kpiCol||''))+'</div>';return}
+  if(w.type==='kpi'){var val=w.kpiCol?computeKPI(w.kpiCol,w.aggrKpi||'sum'):0;var ag=AGGR_TYPES.find(function(a){return a.id===(w.aggrKpi||'sum')});var kc=w._kpiCmp,kh='';if(kc&&kc.pct!==null&&kc.pct!==undefined){var up=kc.direction==='up',flat=kc.direction==='flat';var arr=flat?'\u2192':(up?'\u2191':'\u2193');var kcol=flat?'#898781':(up?'#006300':'#d03b3b');var kp=(Math.abs(kc.pct)<0.05?'0':(kc.pct>0?'+':'\u2212')+Math.abs(kc.pct).toLocaleString('fr-FR',{maximumFractionDigits:1}));kh='<div class="kpi-sub" style="color:'+kcol+';font-weight:800">'+arr+' '+kp+' % '+'<span style="color:#898781;font-weight:500">'+esc(kc.label)+' ('+(kc.previous==null?'\u2014':fmt(kc.previous))+')</span>'+(kc.partial?'<span title="P\u00e9riode en cours, non termin\u00e9e." style="color:#898781"> \u26a0</span>':'')+'</div>';}el.innerHTML='<div class="kpi-val">'+fmt(val)+'</div><div class="kpi-sub">'+(ag?ag.label:'')+' \u2014 '+esc(colLabel(w.kpiCol||''))+'</div>'+kh;return}
   if(w.type==='gauge'){const val=w.gaugeCol?computeKPI(w.gaugeCol,w.aggrGauge||'avg'):0;const gmin=w.gaugeMin||0,gmax=w.gaugeMax||Math.max(val*1.5,100),gt=w.gaugeTarget||gmax*0.8;const pct=Math.max(0,Math.min(1,(val-gmin)/(gmax-gmin)));const tpct=Math.max(0,Math.min(1,(gt-gmin)/(gmax-gmin)));const angle=pct*180;const tx=75+58*Math.cos((tpct*180-180)*Math.PI/180);const ty=76+58*Math.sin((tpct*180-180)*Math.PI/180);const nx=75+44*Math.cos((angle-180)*Math.PI/180);const ny=76+44*Math.sin((angle-180)*Math.PI/180);const isOk=val<=gt;el.innerHTML='<div class="gauge-wrap"><svg width="160" height="90" viewBox="0 0 160 90"><path d="M14,78 A65,65 0 0,1 146,78" fill="none" stroke="#eef2f7" stroke-width="14" stroke-linecap="round"/><path d="M14,78 A65,65 0 0,1 146,78" fill="none" stroke="'+color+'" stroke-width="14" stroke-linecap="round" stroke-dasharray="'+(pct*204)+' 204"/><circle cx="'+tx+'" cy="'+ty+'" r="5" fill="'+(isOk?'#1D9E75':'#D85A30')+'" stroke="#fff" stroke-width="2"/><line x1="75" y1="76" x2="'+nx+'" y2="'+ny+'" stroke="#1a2733" stroke-width="2.5" stroke-linecap="round"/><circle cx="75" cy="76" r="5" fill="#1a2733"/><text x="75" y="66" text-anchor="middle" font-size="13" font-weight="800" fill="#1a2733" font-family="Barlow Condensed">'+fmt(val)+'</text></svg><div style="display:flex;gap:14px;font-size:10px;color:var(--mid)"><span>Min: <b>'+fmt(gmin)+'</b></span><span style="color:'+(isOk?'#1D9E75':'#D85A30')+'">Cible: <b>'+fmt(gt)+'</b></span><span>Max: <b>'+fmt(gmax)+'</b></span></div></div>';return}
   if(w.type==='table'){const cols=(w.tableCols&&w.tableCols.length)?w.tableCols:columns.slice(0,5).map(c=>c.name);el.innerHTML=renderTableHTML(cols,5,w.tableMode,w.tableAggr);return}
   if(w.type==='geo'){if(!w.col){return}const gd=groupByDim(w.col,w.col2,w.aggr||(w.col2?'sum':'count'),300);renderGeoWidget(w,el,wi,gd.map(d=>d[0]),gd.map(d=>d[1]),color);return}
@@ -8339,13 +8786,36 @@ widgets.forEach((w,wi)=>{
   let data=[];
   const ci=columns.find(c=>c.name===w.col);
   if(w.type==='line')data=ci?.type==='date'?groupByTime(w.col,w.col2,w.aggr||'sum',12):groupByDim(w.col,w.col2,w.aggr||'count',12);
+  else if(ci?.type==='date'&&(w.type==='bar'||w.type==='donut'))data=groupByTime(w.col,w.col2,w.aggr||'sum',w.type==='donut'?8:12);
   else data=groupByDim(w.col,w.col2,w.aggr||(w.col2?'sum':'count'),10);
-  const labels=data.map(d=>d[0]),values=data.map(d=>d[1]);
+  let labels=data.map(d=>d[0]),values=data.map(d=>d[1]);
 
 
   if(w.type==='donut'){const tot=values.reduce((s,v)=>s+v,0);el.innerHTML='<div class="donut-wrap"><canvas id="c'+wi+'" width="130" height="130" style="flex-shrink:0"></canvas><div style="flex:1;min-width:0">'+labels.slice(0,8).map((l,i)=>'<div class="dl"><div class="dl-dot" style="background:'+COLORS[i%COLORS.length]+'"></div><div style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(l)+'</div><div style="color:var(--mid);font-size:10px">'+fmt(values[i])+' · '+(tot?Math.round(values[i]/tot*100):0)+'%</div></div>').join('')+'</div></div>';new Chart(document.getElementById('c'+wi),{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:COLORS.slice(0,labels.length),borderWidth:2,borderColor:'#fff'}]},options:{animation:false,responsive:false,plugins:{legend:{display:false}},cutout:'60%'}});return}
   el.innerHTML='<div class="chart-wrap"><canvas id="c'+wi+'"></canvas></div>';
   const isLine=w.type==='line';
+  var tiE=w._ti||null;
+  var tiLabels=tiE?tiE.labels:labels, tiValues=tiE?tiE.base:values;
+  var tiSets=[{label:tiE?tiE.measureLabel:'Valeur',data:tiValues,borderColor:color,backgroundColor:color+'22',borderWidth:2,pointRadius:3,pointBackgroundColor:color,fill:!tiE,tension:0.3,order:1}];
+  if(tiE){
+    if(tiE.compare) tiSets.push({label:tiE.compareLabel,data:tiE.compare,borderColor:'#898781',backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0,fill:false,tension:0.3,order:3,spanGaps:false});
+    if(tiE.movingAvg) tiSets.push({label:tiE.movingAvgLabel,data:tiE.movingAvg,borderColor:'#7F77DD',backgroundColor:'transparent',borderWidth:2,pointRadius:0,fill:false,tension:0.4,order:2,spanGaps:true});
+    if(tiE.cumul) tiSets.push({label:tiE.cumulLabel,data:tiE.cumul,borderColor:'#1D9E75',backgroundColor:'transparent',borderWidth:2,pointRadius:0,fill:false,tension:0.25,order:4,yAxisID:'yCumul'});
+  }
+  var tiMulti=tiSets.length>1;
+  if(isLine&&tiMulti){
+    var tiScales={x:{grid:{display:false},ticks:{font:{size:9},maxRotation:38,maxTicksLimit:8}},y:{grid:{color:'#f0f3f7'},ticks:{font:{size:9},callback:function(v){return fmt(v);}}}};
+    if(tiE&&tiE.cumul) tiScales.yCumul={position:'right',display:false,grid:{display:false}};
+    new Chart(document.getElementById('c'+wi),{type:'line',data:{labels:tiLabels,datasets:tiSets},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,normalized:true,
+        interaction:{mode:'index',intersect:false},
+        plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,boxHeight:10,font:{size:9},usePointStyle:true,pointStyle:'line'}},
+                 tooltip:{callbacks:{label:function(c){return c.dataset.label+' : '+(c.raw==null?'\u2014':fmt(c.raw));}}},
+                 fpValueLabels:{display:false}},
+        layout:{padding:{top:18}},scales:tiScales}});
+    return;
+  }
+  if(isLine&&tiE){ labels=tiLabels; values=tiValues; }
   new Chart(document.getElementById('c'+wi),isLine?{type:'line',data:{labels,datasets:[{data:values,borderColor:color,backgroundColor:color+'22',borderWidth:2,pointRadius:3,pointBackgroundColor:color,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,animation:false,responsiveAnimationDuration:0,normalized:true,plugins:{legend:{display:false},fpValueLabels:{display:true,maxLabels:12}},layout:{padding:{top:18}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:38,maxTicksLimit:7}},y:{grid:{color:'#f0f3f7'},ticks:{font:{size:9},callback:v=>fmt(v)}}}}}:{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:color+'cc',borderColor:color,borderWidth:1,borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,animation:false,responsiveAnimationDuration:0,normalized:true,plugins:{legend:{display:false},fpValueLabels:{display:true,maxLabels:12}},layout:{padding:{top:18}},scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:38}},y:{grid:{color:'#f0f3f7'},ticks:{font:{size:9},callback:v=>fmt(v)}}}}});
 });
 <\/script>
@@ -8468,6 +8938,12 @@ widgets.forEach((w,wi)=>{
       .fp-gf-count.active{color:var(--green)}
       .fp-gf-hint{font-size:10px;color:var(--muted);white-space:nowrap}
       @media (max-width:1100px){.fp-global-filter-bar{position:relative}.fp-gf-count{margin-left:0;width:100%}}
+      /* Écrans tactiles : 44 px, et 16 px de police pour qu'iOS ne zoome pas
+         automatiquement à la mise au point d'un champ. */
+      @media (pointer:coarse){
+        .fp-gf-select,.fp-gf-date,.fp-gf-reset,.fp-gf-period-btn,.fp-gf-btn{
+          min-height:44px;font-size:16px;padding:8px 12px}
+      }
     `;
     document.head.appendChild(st);
   }
@@ -9196,7 +9672,7 @@ widgets.forEach((w,wi)=>{
     const fmtFn="function fmt(n){if(Math.abs(n)>=1e6)return(n/1e6).toFixed(1)+'M';if(Math.abs(n)>=1e3)return(n/1e3).toFixed(1)+'k';return Number.isInteger(n)?String(n):parseFloat(n.toFixed(2)).toString()}";
     const newFmtFn="let __fpCurrentWidget=null;function __fpNum(v){const n=parseFloat(String(v??'').replace(/\\s/g,'').replace(',','.'));return Number.isFinite(n)?n:0}function __fpCompact(n){const a=Math.abs(n);if(a>=1e9)return(n/1e9).toLocaleString('fr-FR',{maximumFractionDigits:1})+'Md';if(a>=1e6)return(n/1e6).toLocaleString('fr-FR',{maximumFractionDigits:1})+'M';if(a>=1e3)return(n/1e3).toLocaleString('fr-FR',{maximumFractionDigits:1})+'k';return Number.isInteger(n)?n.toLocaleString('fr-FR'):n.toLocaleString('fr-FR',{maximumFractionDigits:2})}function fmt(v,w){const n=__fpNum(v);w=w||__fpCurrentWidget||{};const f=w.valueFormat||'auto';const d=Number.isFinite(parseInt(w.valueDecimals,10))?Math.max(0,Math.min(6,parseInt(w.valueDecimals,10))):(f==='integer'?0:f==='percent'?1:2);const cur=w.valueCurrency||'EUR';const g=w.valueThousands!==false;const u=w.valueUnit||'';const add=s=>u?s+'\u202f'+u:s;if(f==='integer')return add(n.toLocaleString('fr-FR',{useGrouping:g,maximumFractionDigits:0}));if(f==='decimal')return add(n.toLocaleString('fr-FR',{useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d}));if(f==='currency')return add(new Intl.NumberFormat('fr-FR',{style:'currency',currency:cur,useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d}).format(n));if(f==='percent')return add(n.toLocaleString('fr-FR',{useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d})+' %');return add(__fpCompact(n))}";
     html=html.replace(fmtFn,newFmtFn);
-    html=html.replace("widgets.forEach((w,wi)=>{","widgets.forEach((w,wi)=>{__fpCurrentWidget=w;");
+    html=html.replace("widgets.forEach((w,wi)=>{","widgets.forEach((w,wi)=>{__fpCurrentWidget=w;__fpApplyScope(w);");
     html=html.replace(/function formatTableCell\(colName,value,isAggregated,measureCols\)\{.*\}/,"function formatTableCell(colName,value,isAggregated,measureCols){var col=(typeof columns!==\'undefined\'?columns:[]).find(function(c){return c.name===colName;});if(col&&col.type===\'date\'){var df=(typeof colDisplayFormats!==\'undefined\'?colDisplayFormats:{})[colName]||\'date_short\';var pad=function(n){return String(n).padStart(2,\'0\')};var v=value;if(typeof v===\'string\'||typeof v===\'number\'){var d=new Date(v);if(!isNaN(d.getTime())){if(df===\'date_short\')return pad(d.getDate())+\'/\'+pad(d.getMonth()+1)+\'/\'+d.getFullYear();if(df===\'time\')return pad(d.getHours())+\':  \'+pad(d.getMinutes());if(df===\'datetime\')return pad(d.getDate())+\'/\'+pad(d.getMonth()+1)+\'/\'+d.getFullYear()+\' \'+pad(d.getHours())+\':  \'+pad(d.getMinutes());if(df===\'date_long\'){var M=[\'janvier\',\'février\',\'mars\',\'avril\',\'mai\',\'juin\',\'juillet\',\'août\',\'septembre\',\'octobre\',\'novembre\',\'décembre\'];return d.getDate()+\' \'+M[d.getMonth()]+\' \'+d.getFullYear();}return String(v)}}return String(v??\'\')}if((measureCols&&measureCols.includes(colName))||isMeasureColumn(colName))return fmt(value,__fpCurrentWidget);return String(value??\'\')}");
     html=html.replace(/callback:v=>fmt\(v\)/g,"callback:v=>fmt(v,w)");
     html=html.replace(/fmt\(val\)/g,"fmt(val,w)");
@@ -9268,6 +9744,12 @@ function cfRowsExcluding(excludeWid){
   if(!active.length) return null;
   return base.filter(function(r){
     return active.every(function(f){
+      // Colonne date : la cellule est un objet Date, jamais égal à « 2024-03 ».
+      // On compare sur la même clé de période que celle émise au clic.
+      if(f.grain){
+        var d=parseDateValue(r[f.col]);
+        return !!d && fpPeriodKey(d,f.grain)===String(f.val);
+      }
       if(f.vals&&f.vals.length){ var s=String(r[f.col]); return f.vals.some(function(v){return s===String(v);}); }
       return String(r[f.col])===String(f.val);
     });
@@ -9275,14 +9757,20 @@ function cfRowsExcluding(excludeWid){
 }
 function cfRows(){ return cfRowsExcluding(null); }
 
-function cfToggle(wid,col,val,vals){
+function cfToggle(wid,col,val,vals,grain){
+  // Sur une colonne date, la valeur émise est une clé de période : on retient
+  // la granularité pour pouvoir la recalculer ligne à ligne.
+  if(grain===undefined){
+    var ci=columns.find(function(c){return c.name===col;});
+    grain=(ci&&ci.type==='date')?(colDateFormats[col]||'month'):null;
+  }
   var i=cfFilters.findIndex(function(f){return f.wid===wid;});
   if(i!==-1){
     var e=cfFilters[i];
     if(e.col===col&&String(e.val)===String(val)) cfFilters.splice(i,1); // reclic = on retire
-    else cfFilters[i]={wid:wid,col:col,val:val,vals:vals||null}; // nouvelle sélection dans le même widget = remplace
+    else cfFilters[i]={wid:wid,col:col,val:val,vals:vals||null,grain:grain||null}; // nouvelle sélection dans le même widget = remplace
   } else {
-    cfFilters.push({wid:wid,col:col,val:val,vals:vals||null});
+    cfFilters.push({wid:wid,col:col,val:val,vals:vals||null,grain:grain||null});
   }
   cfPruneStale();
   cfBarRender();
@@ -9338,6 +9826,7 @@ function cfBarRender(){
   bar.classList.add('open');
 }
 function cfBarHide(){var b=document.getElementById('fp-cf-bar');if(b) b.classList.remove('open');}
+window.cfRowsExcluding=cfRowsExcluding;
 window.cfClearOne=cfClearOne;
 window.cfClearAll=cfClearAll;
 window.fpV53CFClear=cfClearAll; // rétro-compatibilité
@@ -9356,7 +9845,7 @@ window.fpGeoActiveSel=function(w){
   return f||null;
 };
 // Hooks génériques (tableau, futurs widgets) : mêmes règles que cfToggle
-window.fpCfToggle=function(wid,col,val,vals){ cfToggle(wid,col,val,vals||null); };
+window.fpCfToggle=function(wid,col,val,vals,grain){ cfToggle(wid,col,val,vals||null,grain); };
 window.fpCfActive=function(wid){ return cfFilters.find(function(x){return x.wid===wid;})||null; };
 
 // Surbrillance : dans son propre widget-source, on assombrit tout sauf le segment sélectionné
@@ -9401,11 +9890,23 @@ function cfPatch(w){
     }
     var idx=pts[0].index, label=chart.data.labels[idx];
     if(label==null||!w.col) return;
-    cfToggle(w.id,w.col,label);
+    // La clé canonique est mémorisée à côté du libellé affiché : sans elle,
+    // un libellé mis en forme (« Jan 2026 ») ne correspond à aucune ligne.
+    var map=w.__keyByLabel||null;
+    var key=(map&&map[String(label)]!=null)?map[String(label)]:label;
+    if(w.drillMode==='drill'&&!evt.altKey){
+      if(fpDrillCanDescend(w)) fpDrillDown(w.id,key,label);
+      else fpOpenDrillRows(w.id);
+      return;
+    }
+    var ciCf=columns.find(function(c){return c.name===w.col;});
+    cfToggle(w.id,w.col,key,null,(ciCf&&ciCf.type==='date')?fpDrillGrain(w):null);
   };
   chart.canvas.addEventListener('click',chart.__cfB);
   chart.canvas.style.cursor='pointer';
-  chart.canvas.title='Cliquer pour filtrer les autres widgets (combinable)';
+  chart.canvas.title=(w.drillMode==='drill')
+    ? (fpDrillCanDescend(w)?'Cliquer pour descendre d\'un niveau (Alt+clic : filtrer les autres widgets)':'Cliquer pour voir les lignes (Alt+clic : filtrer)')
+    : 'Cliquer pour filtrer les autres widgets (combinable)';
   cfHighlight(w);
 }
 
@@ -9797,14 +10298,8 @@ window.saveWidget=saveWidget=function(){
   return out;
 };
 
-// Les exports HTML générés doivent conserver le séparateur de milliers et l'unité libre.
-const prevBuildExportHTMLV55=window.buildExportHTML||buildExportHTML;
-window.buildExportHTML=buildExportHTML=function(){
-  let html=prevBuildExportHTMLV55.apply(this,arguments);
-  html=html.replace(/function fmt\(v,w\)\{const n=__fpNum\(v\);w=w\|\|__fpCurrentWidget\|\|\{\};const f=w\.valueFormat\|\|'auto';const d=Number\.isFinite\(parseInt\(w\.valueDecimals,10\)\)\?Math\.max\(0,Math\.min\(6,parseInt\(w\.valueDecimals,10\)\)\):\(f==='integer'\?0:f==='percent'\?1:2\);const cur=w\.valueCurrency\|\|'EUR';if\(f==='integer'\)return n\.toLocaleString\('fr-FR',\{maximumFractionDigits:0\}\);if\(f==='decimal'\)return n\.toLocaleString\('fr-FR',\{minimumFractionDigits:d,maximumFractionDigits:d\}\);if\(f==='currency'\)return new Intl\.NumberFormat\('fr-FR',\{style:'currency',currency:cur,minimumFractionDigits:d,maximumFractionDigits:d\}\)\.format\(n\);if\(f==='percent'\)return n\.toLocaleString\('fr-FR',\{minimumFractionDigits:d,maximumFractionDigits:d\}\)\+' %';return __fpCompact\(n\)\}/,
-    "function fmt(v,w){const n=__fpNum(v);w=w||__fpCurrentWidget||{};const f=w.valueFormat||'auto';const d=Number.isFinite(parseInt(w.valueDecimals,10))?Math.max(0,Math.min(6,parseInt(w.valueDecimals,10))):(f==='integer'?0:f==='percent'?1:2);const cur=w.valueCurrency||'EUR';const g=w.valueThousands!==false;const u=w.valueUnit||'';const add=s=>u?s+'\\u202f'+u:s;if(f==='integer')return add(n.toLocaleString('fr-FR',{useGrouping:g,maximumFractionDigits:0}));if(f==='decimal')return add(n.toLocaleString('fr-FR',{useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d}));if(f==='currency')return add(new Intl.NumberFormat('fr-FR',{style:'currency',currency:cur,useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d}).format(n));if(f==='percent')return add(n.toLocaleString('fr-FR',{useGrouping:g,minimumFractionDigits:d,maximumFractionDigits:d})+' %');return add(__fpCompact(n))}");
-  return html;
-};
+// (wrapper V5.5 retiré : sa regex ne pouvait plus matcher — le patch V5.0
+//  produit déjà la version finale de fmt() avec séparateur et unité.)
 
 console.log('[FlowPilot V5.5] Numeric formats OK');
 })();
@@ -10877,190 +11372,10 @@ console.log('[FlowPilot V5.9] Save/Load .fpstudio OK - Ctrl+S actif');
 // Historique par widget : { [wid]: [{role,content}] }
 const _waiHistory = {};
 
-function toggleWidgetAI(wid, btn){
-  // Fermer toutes les autres boxes ouvertes
-  document.querySelectorAll('.wc-ai-box.open').forEach(b => {
-    if(b.id !== 'wc-ai-'+wid){
-      b.classList.remove('open');
-    }
-  });
 
-  const box = document.getElementById('wc-ai-'+wid);
-  if(!box) return;
 
-  if(box.classList.contains('open')){
-    box.classList.remove('open');
-    return;
-  }
 
-  // Construire la box si vide
-  if(!box.innerHTML){
-    _waiHistory[wid] = [];
-    const w = widgets.find(x=>x.id===wid);
-    _buildWidgetAIBox(box, wid, w);
-  }
 
-  box.classList.add('open');
-
-  // Fermer si clic extérieur
-  setTimeout(()=>{
-    const close = e => {
-      if(!box.contains(e.target) && !btn.contains(e.target)){
-        box.classList.remove('open');
-        document.removeEventListener('mousedown', close, true);
-      }
-    };
-    document.addEventListener('mousedown', close, true);
-  }, 10);
-}
-
-function _buildWidgetAIBox(box, wid, w){
-  const typeLabels = {kpi:'KPI',gauge:'Jauge',bar:'Histogramme',donut:'Secteurs',line:'Courbe',table:'Tableau'};
-  const typeName = typeLabels[w?.type||''] || (w?.type||'Widget');
-  const title = w ? (getWidgetTitle(w)||typeName) : 'Widget';
-
-  // Suggestions contextuelles selon le type
-  const suggestions = _waiSuggestions(w);
-
-  box.innerHTML = `
-    <div class="wc-ai-head">
-      <span class="wc-ai-head-icon">✨</span>
-      <span class="wc-ai-head-title">IA · ${esc(title)}</span>
-      <button class="wc-ai-head-close" onclick="document.getElementById('wc-ai-${wid}').classList.remove('open')">✕</button>
-    </div>
-    <div class="wc-ai-feed" id="wai-feed-${wid}">
-      <div class="wc-ai-msg ai">
-        <div class="wc-ai-label">Agent IA</div>
-        Dis-moi quoi modifier sur ce ${esc(typeName.toLowerCase())} — colonne, calcul, titre, filtre…
-      </div>
-    </div>
-    <div class="wc-ai-suggestions" id="wai-chips-${wid}">
-      ${suggestions.map(s=>`<button class="wc-ai-chip" onclick="waiChip('${wid}',this)">${esc(s)}</button>`).join('')}
-    </div>
-    <div class="wc-ai-footer">
-      <input class="wc-ai-input" id="wai-inp-${wid}" placeholder="Ex: calcule l'âge moyen par service…"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();widgetAISend('${wid}')}"
-        oninput="document.getElementById('wai-send-${wid}').disabled=!this.value.trim()"/>
-      <button class="wc-ai-send" id="wai-send-${wid}" disabled onclick="widgetAISend('${wid}')">&#10148;</button>
-    </div>
-  `;
-}
-
-function _waiSuggestions(w){
-  if(!w) return [];
-  const base = [];
-  if(w.type==='bar'||w.type==='line') base.push('Changer la mesure','Trier par valeur décroissante','Limiter aux 10 premiers');
-  if(w.type==='kpi') base.push('Recalculer en moyenne','Afficher en pourcentage','Changer la colonne');
-  if(w.type==='table') base.push('Ajouter une colonne','Trier par date','Filtrer les vides');
-  if(w.type==='donut') base.push('Regrouper les petites parts','Afficher le top 5');
-  base.push('Corriger le titre','Expliquer ce résultat');
-  return base.slice(0,4);
-}
-
-function waiChip(wid, btn){
-  const inp = document.getElementById('wai-inp-'+wid);
-  if(!inp) return;
-  inp.value = btn.textContent;
-  document.getElementById('wai-send-'+wid).disabled = false;
-  inp.focus();
-  // Masquer les chips après sélection
-  const chips = document.getElementById('wai-chips-'+wid);
-  if(chips) chips.style.display='none';
-}
-
-async function widgetAISend(wid){
-  const inp = document.getElementById('wai-inp-'+wid);
-  const sendBtn = document.getElementById('wai-send-'+wid);
-  const feed = document.getElementById('wai-feed-'+wid);
-  if(!inp||!sendBtn||!feed) return;
-
-  const text = inp.value.trim();
-  if(!text) return;
-
-  // Vérifier clé OpenAI
-  if(!getOpenAIKey()){ showKeyPrompt(null); return; }
-
-  // Afficher message utilisateur
-  inp.value=''; sendBtn.disabled=true;
-  feed.insertAdjacentHTML('beforeend',`<div class="wc-ai-msg user">${esc(text)}</div>`);
-
-  // Typing indicator
-  const tid = 'wai-typing-'+Date.now();
-  feed.insertAdjacentHTML('beforeend',`<div class="wc-ai-msg ai" id="${tid}"><div class="wc-ai-typing"><span></span><span></span><span></span></div></div>`);
-  feed.scrollTop=feed.scrollHeight;
-
-  // Construire le contexte du widget
-  const w = widgets.find(x=>x.id===wid);
-  const wCtx = _buildWidgetContext(w);
-
-  // Historique
-  if(!_waiHistory[wid]) _waiHistory[wid]=[];
-  _waiHistory[wid].push({role:'user', content:text});
-
-  const systemPrompt = `Tu es un agent BI expert intégré dans FlowPilot Studio. Tu modifies un widget existant selon la demande de l'utilisateur.
-
-WIDGET EN COURS :
-${wCtx}
-
-DONNÉES DISPONIBLES :
-${buildDataContext()}
-
-RÈGLES CRITIQUES :
-
-AGRÉGATIONS DISPONIBLES : sum (somme), avg (moyenne), count (nombre), countd (distinct), min, max, age (âge moyen depuis une date — utilise OBLIGATOIREMENT "age" quand on demande un âge, jamais "avg" sur une colonne date).
-
-CALCUL D'ÂGE : Si on demande "âge moyen" sur une colonne de dates de naissance, utilise aggr="age" et col2 = le nom exact de la colonne date. Exemple :
-<widget>{"type":"bar","col":"SERVICE","col2":"DATE NAISSANCE","aggr":"age","title":"Âge moyen par service"}</widget>
-
-Pour tout autre calcul, réponds UNIQUEMENT avec un bloc JSON valide entre balises <widget> et </widget>, comme ceci :
-<widget>{"type":"bar","col":"SERVICE","col2":"SALAIRE BRUT (€)","aggr":"avg","title":"Salaire moyen par service"}</widget>
-
-Si c'est une question ou une explication (pas une modification), réponds en texte naturel en français, de façon concise (2-3 phrases max).
-Ne mélange jamais JSON et texte dans la même réponse.`;
-
-  try {
-    const reply = (await fpAiChat([
-      {role:'system', content:systemPrompt},
-      ..._waiHistory[wid]
-    ],{maxTokens:400}))||'Pas de réponse.';
-    _waiHistory[wid].push({role:'assistant', content:reply});
-
-    const el = document.getElementById(tid);
-
-    // Détecter si c'est un JSON widget
-    const jsonMatch = reply.match(/<widget>([\s\S]*?)<\/widget>/);
-    if(jsonMatch){
-      try{
-        const patch = JSON.parse(jsonMatch[1].trim());
-        const idx = widgets.findIndex(x=>x.id===wid);
-        if(idx>=0){
-          // Appliquer le patch sur le widget existant
-          Object.assign(widgets[idx], patch);
-          widgets[idx].id = wid; // conserver l'id
-          clearAggregationCache();
-          renderWidgets();
-          if(el) el.innerHTML = `<div class="wc-ai-label">Agent IA</div>✅ Widget mis à jour — vérifie le résultat ci-dessus.`;
-        }
-      }catch(e){
-        if(el) el.innerHTML = `<div class="wc-ai-label">Agent IA</div><span style="color:var(--coral)">⚠ JSON invalide : ${esc(e.message)}</span>`;
-      }
-    } else {
-      // Réponse texte
-      const html = reply
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
-        .replace(/\n/g,'<br>');
-      if(el) el.innerHTML = `<div class="wc-ai-label">Agent IA</div>${html}`;
-    }
-
-  }catch(err){
-    const el = document.getElementById(tid);
-    if(el) el.innerHTML=`<div class="wc-ai-label">Agent IA</div><span style="color:var(--coral)">❌ ${esc(err.message)}</span>`;
-  } finally {
-    sendBtn.disabled=false;
-    feed.scrollTop=feed.scrollHeight;
-  }
-}
 
 function _buildWidgetContext(w){
   if(!w) return 'Widget inconnu';
@@ -11143,7 +11458,7 @@ function renderTable(){
       const typeIcon = c.type==='number'?'#':c.type==='date'?'D':'T';
       const isCalc = c._computed ? ' 🧮' : '';
       const sortClass = _tblSort.col===c.name ? (_tblSort.dir===1?'tbl-sort-asc':'tbl-sort-desc') : '';
-      return `<th class="${sortClass}" onclick="tblSortBy('${c.name.replace(/'/g,"\'")}')">
+      return `<th class="${sortClass}" data-col="${esc(c.name)}" onclick="tblSortBy(this.dataset.col)">
         ${esc(c.name)}${isCalc}<span class="th-type">${typeIcon}</span>
       </th>`;
     }).join('') + '</tr>';
@@ -11186,6 +11501,22 @@ function tblSortBy(col){
 }
 
 /* ── Modal colonne calculée ── */
+
+// Compile une formule dans le langage restreint de widgets/formula.js.
+// Remplace les anciens `new Function` : aucune exécution de code arbitraire.
+let _calcColCompiled = null;
+function fpCompileCalcCol(source){
+  if(typeof window.FP_compileFormula !== 'function'){
+    return { ok:false, error:{ message:"Le moteur de formules n'est pas encore chargé — réessaie dans un instant." } };
+  }
+  return window.FP_compileFormula(source, columns.map(c => ({ name:c.name, type:c.type })));
+}
+
+// Évalue la formule compilée sur les n premières lignes, pour l'aperçu.
+function fpPreviewCalcCol(compiled, n){
+  return rows.slice(0, n).map(r => compiled.evaluate(r, { parseDateValue }));
+}
+
 function openCalcColModal(){
   document.getElementById('calc-col-modal').style.display = 'flex';
   document.getElementById('calc-col-desc').value = '';
@@ -11195,99 +11526,32 @@ function openCalcColModal(){
   document.getElementById('calc-col-apply-btn').style.display = 'none';
   document.getElementById('calc-col-gen-btn').style.display = '';
   _calcColFormula = '';
+  _calcColCompiled = null;
 }
 
 function closeCalcColModal(){
   document.getElementById('calc-col-modal').style.display = 'none';
 }
 
-async function calcColGenerate(){
-  const desc = document.getElementById('calc-col-desc').value.trim();
-  const name = document.getElementById('calc-col-name').value.trim();
-  if(!desc){ document.getElementById('calc-col-err').textContent='Décris la colonne à créer.'; document.getElementById('calc-col-err').style.display=''; return; }
-  if(!name){ document.getElementById('calc-col-err').textContent='Donne un nom à la colonne.'; document.getElementById('calc-col-err').style.display=''; return; }
-  document.getElementById('calc-col-err').style.display = 'none';
 
-  if(!getOpenAIKey()){
-    // La clé se saisit ICI (showKeyPrompt écrit dans le fil de chat IA, invisible depuis cette fenêtre)
-    const keyBox = document.getElementById('calc-col-key');
-    if(keyBox){ keyBox.style.display=''; const ki=document.getElementById('calc-col-key-input'); if(ki) setTimeout(()=>ki.focus(),50); }
-    return;
-  }
-  const keyBoxOk = document.getElementById('calc-col-key');
-  if(keyBoxOk) keyBoxOk.style.display='none';
-
-  const btn = document.getElementById('calc-col-gen-btn');
-  btn.disabled = true; btn.textContent = '⏳ Génération…';
-
-  // Exemple de 3 lignes pour que GPT voit les valeurs réelles
-  const sample = rows.slice(0,3).map(r => {
-    const obj = {};
-    columns.forEach(c => { obj[c.name] = r[c.name]; });
-    return obj;
-  });
-
-  const colList = columns.map(c => `"${c.name}" (${c.type})`).join(', ');
-  const prompt = `Tu génères une formule JavaScript pour créer une nouvelle colonne dans un tableau de données.
-
-COLONNES DISPONIBLES : ${colList}
-EXEMPLE DE LIGNES (3 premières) :
-${JSON.stringify(sample, null, 2)}
-
-DEMANDE : ${desc}
-NOM DE LA NOUVELLE COLONNE : ${name}
-
-Réponds UNIQUEMENT avec un objet JSON (sans balises markdown) contenant :
-{
-  "formula": "r => valeur_calculée",
-  "type": "number" ou "text" ou "date",
-  "examples": ["valeur1", "valeur2", "valeur3"]
-}
-
-La formule est une fonction JavaScript qui prend une ligne r (objet avec les colonnes comme clés) et retourne la valeur calculée.
-Pour les dates : utilise parseDateValue(r["COLONNE"]) qui retourne un objet Date ou null.
-Pour l'âge en années : Math.floor((Date.now() - parseDateValue(r["DATE"])?.getTime()) / (365.25*24*3600*1000))
-Pour les concaténations : (r["COL1"]||'') + ' ' + (r["COL2"]||'')
-Pour les tranches : r["SALAIRE"] < 2000 ? '<2000' : r["SALAIRE"] < 3500 ? '2000-3500' : '>3500'
-La formule doit être robuste aux valeurs nulles/undefined.`;
-
-  try {
-    const raw = (await fpAiChat([{role:'user', content:prompt}],{maxTokens:400, json:true}))||'{}';
-    const clean = raw.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
-
-    _calcColFormula = parsed.formula;
-    _calcColType = parsed.type || 'text';
-
-    // Tester sur les 5 premières lignes
-    const fn = new Function('r','parseDateValue', 'return (' + _calcColFormula + ')(r)');
-    const samples = rows.slice(0,5).map(r => {
-      try { return String(fn(r, parseDateValue) ?? '—'); }
-      catch(e) { return '⚠ erreur'; }
-    });
-
-    document.getElementById('calc-col-formula').textContent = _calcColFormula;
-    document.getElementById('calc-col-samples').innerHTML = samples.map((s,i)=>
-      `<div style="padding:2px 0;border-bottom:1px solid var(--border)">Ligne ${i+1} → <strong>${esc(s)}</strong></div>`
-    ).join('');
-    document.getElementById('calc-col-preview').style.display = '';
-    document.getElementById('calc-col-apply-btn').style.display = '';
-    document.getElementById('calc-col-err').style.display = 'none';
-
-  } catch(err) {
-    document.getElementById('calc-col-err').textContent = '❌ ' + err.message;
-    document.getElementById('calc-col-err').style.display = '';
-    if(String(err.message).indexOf('Impossible de joindre')===0){
-      const mb=document.getElementById('calc-col-manual');
-      if(mb) mb.style.display='';
-    }
-    if(String(err.message).indexOf('Clé API')===0){
-      const kb=document.getElementById('calc-col-key');
-      if(kb) kb.style.display='';
-    }
-  } finally {
-    btn.disabled = false; btn.textContent = '✨ Générer la formule';
-  }
+// Aide en ligne : catalogue des fonctions du langage de formules.
+function fpToggleFormulaHelp(){
+  const box=document.getElementById('calc-col-fnhelp');
+  if(!box) return;
+  if(box.style.display!=='none'){ box.style.display='none'; return; }
+  const fns=window.FP_FORMULA_FUNCTIONS||[];
+  if(!fns.length){ box.innerHTML='<div style="font-size:11px;color:var(--muted)">Catalogue indisponible.</div>'; box.style.display=''; return; }
+  const byCat={};
+  fns.forEach(f=>{ (byCat[f.category]=byCat[f.category]||[]).push(f); });
+  box.innerHTML=Object.keys(byCat).map(cat=>
+    `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:8px 0 4px">${esc(cat)}</div>`+
+    byCat[cat].map(f=>
+      `<div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">`+
+      `<code style="font-family:'DM Mono',monospace;color:var(--navy)">${esc(f.signature)}</code>`+
+      `<div style="color:var(--mid);font-size:10.5px;margin-top:1px">${esc(f.description)}</div></div>`
+    ).join('')
+  ).join('');
+  box.style.display='';
 }
 
 function calcColToggleManual(){
@@ -11303,51 +11567,41 @@ function calcColTestManual(){
   const ta=document.getElementById('calc-col-manual-input');
   const formula=(ta?ta.value:'').trim();
   if(!formula){ err.textContent='Écris une formule d\'abord.'; err.style.display=''; return; }
-  try{
-    const fn=new Function('r','parseDateValue','return ('+formula+')(r)');
-    const samples=rows.slice(0,5).map(r=>{
-      try{ return fn(r,parseDateValue); }catch(e){ return '⚠ '+e.message; }
-    });
-    _calcColFormula=formula;
-    const nums=samples.filter(v=>v!==''&&v!=null&&isFinite(parseFloat(String(v).replace(',','.'))));
-    _calcColType=(nums.length===samples.filter(v=>v!==''&&v!=null).length&&nums.length>0)?'number':'text';
-    document.getElementById('calc-col-formula').textContent=_calcColFormula;
-    document.getElementById('calc-col-samples').innerHTML=samples.map((v,i)=>
-      `<div style="padding:2px 0;border-bottom:1px solid var(--border)">Ligne ${i+1} → <strong>${esc(String(v??'—'))}</strong></div>`
-    ).join('');
-    document.getElementById('calc-col-preview').style.display='';
-    document.getElementById('calc-col-apply-btn').style.display='';
-    err.style.display='none';
-  }catch(e){
-    err.textContent='❌ Formule invalide : '+e.message;
+  const compiled=fpCompileCalcCol(formula);
+  if(!compiled.ok){
+    const pos=compiled.error.position;
+    err.textContent='❌ '+compiled.error.message+(pos!=null?` (caractère ${pos+1})`:'');
     err.style.display='';
+    document.getElementById('calc-col-preview').style.display='none';
+    document.getElementById('calc-col-apply-btn').style.display='none';
+    return;
   }
+  _calcColCompiled=compiled;
+  _calcColFormula=compiled.normalized||formula;
+  _calcColType=compiled.type||'text';
+  const samples=fpPreviewCalcCol(compiled,5);
+  document.getElementById('calc-col-formula').textContent=_calcColFormula;
+  document.getElementById('calc-col-samples').innerHTML=samples.map((v,i)=>
+    `<div style="padding:2px 0;border-bottom:1px solid var(--border)">Ligne ${i+1} → <strong>${esc(String(v??'—'))}</strong></div>`
+  ).join('');
+  document.getElementById('calc-col-preview').style.display='';
+  document.getElementById('calc-col-apply-btn').style.display='';
+  err.style.display='none';
 }
 
-function calcColSaveKey(){
-  const ki=document.getElementById('calc-col-key-input');
-  const val=(ki?ki.value:'').trim();
-  if(setOpenAIKey(val)){
-    document.getElementById('calc-col-key').style.display='none';
-    document.getElementById('calc-col-err').style.display='none';
-    calcColGenerate(); // relance aussitôt la génération
-  } else {
-    if(ki) ki.style.borderColor='var(--coral)';
-    document.getElementById('calc-col-err').textContent='❌ Clé invalide — elle doit commencer par « sk- ».';
-    document.getElementById('calc-col-err').style.display='';
-  }
-}
 
 function calcColApply(){
   const name = document.getElementById('calc-col-name').value.trim();
-  if(!name || !_calcColFormula) return;
+  if(!name || !_calcColCompiled) return;
 
-  // Appliquer la formule à toutes les lignes
-  const fn = new Function('r','parseDateValue', 'return (' + _calcColFormula + ')(r)');
+  // Appliquer la formule compilée à toutes les lignes. evaluate() ne jette
+  // jamais : une valeur incalculable ressort à null.
+  const helpers = { parseDateValue };
   let errors = 0;
   rows.forEach(r => {
-    try { r[name] = fn(r, parseDateValue); }
-    catch(e) { r[name] = null; errors++; }
+    const v = _calcColCompiled.evaluate(r, helpers);
+    if(v === null || v === undefined) errors++;
+    r[name] = v;
   });
 
   // Ajouter la colonne à columns
@@ -11359,7 +11613,7 @@ function calcColApply(){
   closeCalcColModal();
   renderTable();
 
-  const msg = errors > 0 ? `⚠ Colonne "${name}" ajoutée (${errors} erreurs)` : `✓ Colonne "${name}" ajoutée — disponible dans tous les widgets`;
+  const msg = errors > 0 ? `⚠ Colonne "${name}" ajoutée — ${errors} ligne(s) sans résultat` : `✓ Colonne "${name}" ajoutée — disponible dans tous les widgets`;
   toast(msg);
 }
 
@@ -11458,22 +11712,12 @@ function fpSettingsBtnRefresh(){
   const b=document.getElementById('fp-settings-btn');
   if(!b) return;
   const ini=fpInitials(fpProfile().name);
-  const st=fpAiLastStatus();
-  const dot=st?'<span title="IA : '+esc(st.message)+'" style="position:absolute;top:-2px;right:-2px;width:9px;height:9px;border-radius:99px;border:2px solid var(--card);background:'+(st.ok?'var(--green)':'var(--coral)')+'"></span>':'';
+  const dot='';
   b.style.position='relative';
   b.innerHTML=(ini
     ? '<span style="width:26px;height:26px;border-radius:99px;background:var(--accent);color:#0d1b2a;display:inline-grid;place-items:center;font-size:11px;font-weight:900">'+esc(ini)+'</span>'
     : '<span style="font-size:15px">⚙️</span>')+dot;
 }
-function fpAiLastStatus(){ try{ return JSON.parse(localStorage.getItem('fp_ai_last_status')||'null'); }catch(e){ return null; } }
-async function fpAiBootCheck(){
-  const pid=fpAiActive();
-  if(!pid) return;
-  const res=await fpAiTestKey(pid,fpAiKeys()[pid]);
-  try{ localStorage.setItem('fp_ai_last_status',JSON.stringify({pid:pid, ok:res.ok, message:res.message, at:Date.now()})); }catch(e){}
-  fpSettingsBtnRefresh();
-}
-setTimeout(fpAiBootCheck, 2500);
 
 (function injectSettingsBtn(){
   const target=document.querySelector('.tb-actions');
@@ -11508,8 +11752,6 @@ function fpOpenSettings(instant){
   ov.style.cssText='position:fixed;inset:0;z-index:940;background:rgba(8,14,22,.5);backdrop-filter:blur(2px);opacity:0;transition:opacity .2s ease';
   const prof=fpProfile();
   const lang=(window.FP_getLang&&window.FP_getLang())||'fr';
-  const keys=fpAiKeys();
-  const active=fpAiActive();
   const curSkin=(localStorage.getItem('fpTheme')||'light');
 
   const histo=fpHistory();
@@ -11525,46 +11767,6 @@ function fpOpenSettings(instant){
       +'</button>';
   }).join('')+'<button type="button" onclick="localStorage.removeItem(\'fp_file_history\');fpSettingsRefresh();" style="background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;text-decoration:underline;padding:2px 0;font-family:inherit">Vider l\'historique</button>'
   :'<div style="font-size:11px;color:var(--muted)">Aucun fichier chargé pour l\'instant.</div>';
-
-  const ALLP=fpAiProviders();
-  const savedPids=Object.keys(ALLP).filter(pid=>keys[pid]);
-  const lastSt=fpAiLastStatus();
-  const aiHtml=(savedPids.length?savedPids.map(pid=>{
-    const P=ALLP[pid];
-    const k=keys[pid]||'';
-    const masked='••••'+k.slice(-4);
-    const isActive=active===pid;
-    const stTxt=(lastSt&&lastSt.pid===pid)?((lastSt.ok?'✅ ':'❌ ')+lastSt.message):'';
-    return '<div style="border:1px solid '+(isActive?'var(--accent)':'var(--border)')+';border-radius:12px;padding:10px 12px;margin-bottom:8px;background:'+(isActive?'var(--accent-soft)':'var(--card2)')+'">'
-      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer">'
-      +'<input type="radio" name="fp-ai-active" value="'+pid+'" '+(isActive?'checked':'')+' style="accent-color:var(--accent)" onchange="fpAiSetActive(\''+pid+'\');fpSettingsVerify(\''+pid+'\')"/>'
-      +'<span style="font-size:12px;font-weight:800;color:var(--dark)">'+esc(P.label)+'</span>'
-      +'<span style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted)">'+masked+'</span>'
-      +'<span style="margin-left:auto;display:flex;gap:5px">'
-      +'<button type="button" class="btn" style="padding:4px 8px;font-size:10px" onclick="fpSettingsVerify(\''+pid+'\')">Vérifier</button>'
-      +'<button type="button" class="btn" style="padding:4px 7px;font-size:10px" title="Supprimer cette clé" onclick="fpAiRemoveKey(\''+pid+'\');fpSettingsRefresh()">🗑</button>'
-      +'</span></label>'
-      +'<div id="fp-ai-status-'+pid+'" style="font-size:10px;margin-top:5px;min-height:12px;color:var(--muted)">'+stTxt+'</div>'
-      +'</div>';
-  }).join(''):'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Aucune clé enregistrée pour l\'instant.</div>')
-  // formulaire d'ajout
-  +'<button type="button" class="btn" style="width:100%;justify-content:center" onclick="document.getElementById(\'fp-ai-add\').style.display=document.getElementById(\'fp-ai-add\').style.display===\'none\'?\'\':\'none\'">➕ Ajouter une clé</button>'
-  +'<div id="fp-ai-add" style="display:'+(savedPids.length?'none':'')+';margin-top:8px;border:1px dashed var(--border);border-radius:12px;padding:12px;background:var(--card2)">'
-  +'<select id="fp-ai-new-provider" onchange="document.getElementById(\'fp-ai-custom-fields\').style.display=this.value===\'__custom\'?\'\':\'none\'" style="width:100%;font-size:12px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--dark);font-family:inherit;margin-bottom:7px">'
-  +Object.keys(FP_AI_PROVIDERS).map(pid=>'<option value="'+pid+'">'+esc(FP_AI_PROVIDERS[pid].label)+'</option>').join('')
-  +'<option value="__custom">Autre fournisseur (API compatible OpenAI)…</option>'
-  +'</select>'
-  +'<div id="fp-ai-custom-fields" style="display:none;margin-bottom:7px">'
-  +'<input type="text" id="fp-ai-custom-name" placeholder="Nom (ex : Groq, Grok, OpenRouter…)" style="width:100%;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-family:inherit;margin-bottom:5px"/>'
-  +'<input type="text" id="fp-ai-custom-url" placeholder="URL de base (ex : https://api.groq.com/openai/v1)" style="width:100%;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-family:\'DM Mono\',monospace;margin-bottom:5px"/>'
-  +'<input type="text" id="fp-ai-custom-model" placeholder="Modèle (ex : llama-3.3-70b-versatile)" style="width:100%;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-family:\'DM Mono\',monospace"/>'
-  +'</div>'
-  +'<div style="display:flex;gap:6px">'
-  +'<input type="password" id="fp-ai-new-key" placeholder="Clé API" style="flex:1;min-width:0;font-size:11px;padding:7px 9px;border:1px solid var(--border);border-radius:8px;font-family:\'DM Mono\',monospace"/>'
-  +'<button type="button" class="btn btn-primary" style="padding:6px 10px;font-size:11px;white-space:nowrap" onclick="fpSettingsAddKey()">Vérifier & enregistrer</button>'
-  +'</div>'
-  +'<div id="fp-ai-add-status" style="font-size:10px;margin-top:6px;min-height:12px;color:var(--muted)"></div>'
-  +'</div>';
 
   ov.innerHTML='<div id="fp-settings-panel" style="position:absolute;top:0;right:0;bottom:0;width:min(420px,94vw);background:var(--card);border-left:1px solid var(--border);box-shadow:-24px 0 60px rgba(0,0,0,.35);display:flex;flex-direction:column;transform:translateX(105%);transition:transform .22s ease">'
     +'<div style="background:var(--navy);padding:16px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0">'
@@ -11584,8 +11786,11 @@ function fpOpenSettings(instant){
       +['fr','en'].map(l=>'<button type="button" class="btn" style="flex:1;justify-content:center;'+(lang===l?'border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:800':'')+'" onclick="window.FP_setLang&&FP_setLang(\''+l+'\');fpSettingsRefresh();">'+(l==='fr'?'🇫🇷 Français':'🇬🇧 English')+'</button>').join('')
       +'</div>')
     +fpSettingsSection('Historique des données', histoHtml)
-    +fpSettingsSection('Intelligence artificielle',
-      '<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Choisis le fournisseur actif et renseigne sa clé — « Tester » vérifie la clé auprès du fournisseur avant de charger tes données.</div>'+aiHtml)
+    +fpSettingsSection('Confidentialité',
+      '<div style="font-size:11px;color:var(--mid);line-height:1.5">FlowPilot n\'envoie <strong>aucune donnée</strong> vers un service externe. '
+      +'Le fichier est lu, analysé et affiché entièrement dans ce navigateur. Aucune clé API n\'est nécessaire, '
+      +'et aucun compte n\'est requis.<br><br>Les seules ressources chargées depuis Internet sont les bibliothèques '
+      +'graphiques et les fonds de carte — jamais vos données.</div>')
     +fpSettingsSection('Thème',
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
       +FP_SKINS.map(t=>'<button type="button" class="btn" style="justify-content:center;'+(curSkin===t.id?'border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:800':'')+'" onclick="fpApplyTheme(\''+t.id+'\');fpSettingsRefresh();">'+t.icon+' '+t.label+'</button>').join('')
@@ -11616,63 +11821,38 @@ function fpOpenSettings(instant){
   if(active&&keys[active]) fpSettingsVerify(active);
 }
 // Vérifie la clé enregistrée d'un fournisseur (carte du tiroir)
-async function fpSettingsVerify(pid){
-  const st=document.getElementById('fp-ai-status-'+pid);
-  const key=fpAiKeys()[pid];
-  if(!st||!key) return;
-  const P=fpAiProviders()[pid]||{};
-  st.textContent='⏳ Vérification auprès de '+(P.host||'')+'…';
-  st.style.color='var(--muted)';
-  const res=await fpAiTestKey(pid,key);
-  st.textContent=(res.ok?'✅ ':'❌ ')+res.message;
-  st.style.color=res.ok?'var(--green)':'var(--coral)';
-  try{ localStorage.setItem('fp_ai_last_status',JSON.stringify({pid:pid, ok:res.ok, message:res.message, at:Date.now()})); }catch(e){}
-  fpSettingsBtnRefresh();
-}
 // Ajout d'une nouvelle clé : vérifiée auprès du fournisseur avant enregistrement
-async function fpSettingsAddKey(){
-  const sel=document.getElementById('fp-ai-new-provider');
-  const st=document.getElementById('fp-ai-add-status');
-  const key=(document.getElementById('fp-ai-new-key')||{value:''}).value.trim();
-  if(!key){ st.textContent='Renseigne la clé.'; st.style.color='var(--coral)'; return; }
-  let pid=sel.value;
-  if(pid==='__custom'){
-    const name=(document.getElementById('fp-ai-custom-name')||{value:''}).value.trim();
-    const url=(document.getElementById('fp-ai-custom-url')||{value:''}).value.trim();
-    const model=(document.getElementById('fp-ai-custom-model')||{value:''}).value.trim();
-    if(!name||!url||!model){ st.textContent='Nom, URL de base et modèle sont requis pour un fournisseur personnalisé.'; st.style.color='var(--coral)'; return; }
-    pid=fpAiAddCustom(name,url,model);
-  }
-  const P=fpAiProviders()[pid];
-  st.textContent='⏳ Vérification auprès de '+P.host+'…';
-  st.style.color='var(--muted)';
-  const res=await fpAiTestKey(pid,key);
-  if(res.ok){
-    fpAiSetKey(pid,key);
-    fpAiSetActive(pid);
-    try{ localStorage.setItem('fp_ai_last_status',JSON.stringify({pid:pid, ok:true, message:res.message, at:Date.now()})); }catch(e){}
-    fpSettingsRefresh();
-    toast('✅ Clé '+P.label+' vérifiée et enregistrée');
-  } else {
-    st.innerHTML='❌ '+esc(res.message)+' <button type="button" onclick="fpAiSetKey(\''+pid+'\',document.getElementById(\'fp-ai-new-key\').value.trim());fpAiSetActive(\''+pid+'\');fpSettingsRefresh()" style="background:none;border:none;color:var(--mid);text-decoration:underline;cursor:pointer;font-size:10px;font-family:inherit">Enregistrer quand même</button>';
-    st.style.color='var(--coral)';
-  }
-}
 
 </script>
 <script type="module">
-import { renderBar, renderBarPanel, readBarPanel } from './widgets/bar.js';
+import { renderBar } from './widgets/bar.js';
 import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=3';
 import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js';
 import { t, getLang, setLang, createLangSwitcher, applyI18n } from './widgets/i18n.js';
 import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js';
+window.FP_buildFlow          = buildFlow;
+window.FP_computeColumnStats = computeColumnStats;
+window.FP_rankMeasures       = rankMeasures;
+window.FP_rankDimensions     = rankDimensions;
+window.FP_recommendWidget    = recommendWidget;
+window.FP_computeTimeIntel = computeTimeIntel;
+window.FP_periodKey        = periodKey;
+window.FP_keyToStart       = keyToStart;
+window.FP_periodLabel      = periodLabel;
+window.FP_TIME_COMPARE_MODES = TIME_COMPARE_MODES;
+window.FP_TIME_CUMUL_MODES   = TIME_CUMUL_MODES;
+window.FP_compileFormula   = compileFormula;
+window.FP_FORMULA_FUNCTIONS= FORMULA_FUNCTIONS;
+window.FP_PROMPT_GRAMMAR   = PROMPT_GRAMMAR;
+window.FP_FORMULA_LIMITS   = FORMULA_LIMITS;
 window.FP_FONT_LIBRARY     = FONT_LIBRARY;
 window.FP_loadFont         = loadFont;
 window.FP_getFontFamily    = getFontFamily;
 window.FP_buildFontPicker  = buildFontPicker;
 window.FP_renderBar        = renderBar;
-window.FP_renderBarPanel   = renderBarPanel;
-window.FP_readBarPanel     = readBarPanel;
 window.FP_renderDonut      = renderDonut;
 window.FP_renderDonutPanel = renderDonutPanel;
 window.FP_readDonutPanel   = readDonutPanel;

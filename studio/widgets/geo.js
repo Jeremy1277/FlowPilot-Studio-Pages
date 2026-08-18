@@ -1002,6 +1002,8 @@ function fpgeoInjectCSS(){
     '.fpgeo-ctrls{position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px;opacity:0;transition:opacity .25s ease;z-index:3}',
     '.fpgeo-stage:hover .fpgeo-ctrls{opacity:1}',
     '.fpgeo-btn{width:26px;height:26px;border-radius:8px;border:1px solid rgba(13,27,42,.08);background:rgba(255,255,255,.92);backdrop-filter:blur(4px);color:#31465c;font-size:14px;font-weight:700;line-height:1;display:grid;place-items:center;cursor:pointer;box-shadow:0 2px 6px rgba(13,27,42,.10);transition:background .15s,transform .12s;padding:0}',
+    // Les boutons de zoom sont trop petits pour un doigt : 40 px sur tactile.
+    '@media (pointer:coarse){.fpgeo-btn{width:40px;height:40px;font-size:18px}}',
     '.fpgeo-btn:hover{background:#fff;transform:translateY(-1px)}',
     '.fpgeo-btn:active{transform:translateY(0) scale(.96)}',
     ".fpgeo-tip{position:absolute;pointer-events:none;z-index:4;min-width:110px;max-width:220px;background:rgba(13,27,42,.94);color:#fff;border-radius:10px;padding:8px 11px;font-family:'DM Sans',Arial,sans-serif;opacity:0;transform:translateY(4px);transition:opacity .15s ease,transform .15s ease;box-shadow:0 8px 22px rgba(13,27,42,.35)}",
