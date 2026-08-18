@@ -417,12 +417,30 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 .tpl-production{color:#f2b705;background:linear-gradient(135deg,#fff7d6,#ffffff)}
 .tpl-generique{color:#0d1b2a;background:linear-gradient(135deg,#eef2f7,#ffffff)}
 .tpl-name{font-size:clamp(18px,1.25vw,24px);font-weight:800;color:var(--dark)}
-.tpl-desc{font-size:clamp(13px,.85vw,15px);color:var(--muted);margin:8px auto 0;line-height:1.45;max-width:220px}
+.tpl-card{position:relative;display:flex}
+.tpl-card .tpl-btn{width:100%}
+/* Bouton d'aide : discret au repos, la carte reste lisible d'un coup d'œil. */
+.tpl-info{position:absolute;top:14px;left:14px;z-index:2;width:26px;height:26px;border-radius:99px;
+  border:1px solid var(--border);background:var(--card);color:var(--muted);font-family:inherit;
+  font-size:13px;font-weight:800;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0;
+  transition:color .15s,border-color .15s,background .15s}
+.tpl-info:hover{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.tpl-info:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tpl-info[aria-expanded="true"]{color:#fff;background:var(--navy);border-color:var(--navy)}
+/* La description passe en encart flottant : elle ne pousse plus la carte,
+   donc les deux tuiles gardent la même hauteur. */
+.tpl-desc{position:absolute;left:0;right:0;top:calc(100% + 10px);z-index:3;background:var(--navy);color:#fff;
+  border-radius:14px;padding:12px 14px;font-size:12.5px;line-height:1.5;text-align:left;
+  box-shadow:0 14px 34px rgba(13,27,42,.28);animation:tpl-desc-in .2s ease both}
+/* Petite flèche vers la tuile : on voit d'où sort l'encart. */
+.tpl-desc::before{content:"";position:absolute;top:-6px;left:22px;width:12px;height:12px;background:var(--navy);transform:rotate(45deg);border-radius:2px}
+.tpl-desc[hidden]{display:none}
+@keyframes tpl-desc-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
 .tpl-badge{position:absolute;top:14px;right:14px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:4px 9px;border-radius:99px;background:var(--green-soft);color:var(--green)}
 @media (max-width:1320px){.upload-shell{width:min(1040px,calc(100vw - 56px))}.template-grid{grid-template-columns:repeat(3,minmax(220px,1fr));gap:22px}.tpl-btn{min-height:220px}}
 @media (max-width:980px){.template-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tpl-btn{min-height:200px}}
 @media (max-width:760px){#step-data{align-items:flex-start;padding:18px}.upload-shell{width:100%;padding:12px 0}.template-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.tpl-btn{min-height:180px;padding:24px 14px}.tpl-icon-badge{width:78px;height:78px;border-radius:24px}.tpl-icon-badge .ui-svg{width:42px;height:42px}.drop-zone{border-radius:18px}}
-@media (max-width:520px){.template-grid{grid-template-columns:1fr}.tpl-desc{max-width:240px}}
+@media (max-width:520px){.template-grid{grid-template-columns:1fr}}
 
 /* SMART DETECT MODAL */
 #detect-modal{display:none;position:fixed;inset:0;background:rgba(13,27,42,.6);z-index:250;align-items:center;justify-content:center}
@@ -1216,6 +1234,16 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
     <path d="M12 16V11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
     <path d="M9.8 13.2 12 11l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
+  <symbol id="i-assistant" viewBox="0 0 24 24">
+    <!-- Serveur + stylo : la donnée qu'on met en forme. Même grammaire que le
+         reste du jeu d'icônes — 24x24, traits de 1.8, extrémités arrondies. -->
+    <rect x="2.4" y="3" width="12.6" height="5.1" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+    <rect x="2.4" y="10.3" width="12.6" height="5.1" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.8"/>
+    <circle cx="5.3" cy="5.55" r=".95" fill="currentColor"/>
+    <circle cx="5.3" cy="12.85" r=".95" fill="currentColor"/>
+    <path d="M12.2 21.6l3.7-.9 5.7-5.7a1.8 1.8 0 0 0-2.5-2.5l-5.7 5.7-1.2 3.4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M18.6 13.3l2.5 2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  </symbol>
   <symbol id="i-flash" viewBox="0 0 24 24">
     <path d="M13 2.8 5.8 13h5.5L10.7 21.2 18.2 10h-5.6L13 2.8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
   </symbol>
@@ -1340,18 +1368,33 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
         <!-- TEMPLATES -->
         <div class="template-section" style="margin-bottom:28px">
           <div class="template-grid" style="grid-template-columns:repeat(2,minmax(300px,1fr));max-width:800px;margin:0 auto">
-            <button class="tpl-btn" onclick="fpOpenAssistant()">
-              <div class="tpl-icon-badge tpl-auto"><svg class="ui-svg"><use href="#i-flash"></use></svg></div>
-              <div class="tpl-name">Construire avec l'assistant</div>
-              <div class="tpl-desc">Trois questions, et FlowPilot choisit le bon visuel pour vous — avec l'aperçu de vos données à chaque étape</div>
-              <div class="tpl-badge" style="background:var(--green-soft,#e6f5ef);color:var(--green,#1D9E75)">100 % local</div>
-            </button>
-            <button class="tpl-btn" onclick="fpMonTableauDeBord()">
-              <div class="tpl-icon-badge tpl-perso"><svg class="ui-svg"><use href="#i-layout"></use></svg></div>
-              <div class="tpl-name">Mon Tableau de bord</div>
-              <div class="tpl-desc">Canvas vierge ou reprise d'un projet existant</div>
-              <div class="tpl-badge" style="background:rgba(29,158,117,.14);color:#22c55e">Libre</div>
-            </button>
+            <!-- Le bouton « ? » est HORS du <button> : un élément interactif
+                 imbriqué dans un autre est invalide, et le clic déclencherait
+                 la carte. Le conteneur porte le positionnement. -->
+            <div class="tpl-card">
+              <button class="tpl-btn" onclick="fpOpenAssistant()">
+                <div class="tpl-icon-badge tpl-auto"><svg class="ui-svg"><use href="#i-assistant"></use></svg></div>
+                <div class="tpl-name">Construire avec l'assistant</div>
+                <div class="tpl-badge" style="background:var(--green-soft,#e6f5ef);color:var(--green,#1D9E75)">100 % local</div>
+              </button>
+              <button type="button" class="tpl-info" aria-expanded="false" aria-controls="tpl-desc-assistant"
+                      aria-label="À quoi sert l'assistant ?" onclick="fpToggleTplDesc(this)">?</button>
+              <div class="tpl-desc" id="tpl-desc-assistant" role="region" hidden>
+                Trois questions, et FlowPilot choisit le bon visuel pour vous — avec l'aperçu de vos données à chaque étape.
+              </div>
+            </div>
+            <div class="tpl-card">
+              <button class="tpl-btn" onclick="fpMonTableauDeBord()">
+                <div class="tpl-icon-badge tpl-perso"><svg class="ui-svg"><use href="#i-layout"></use></svg></div>
+                <div class="tpl-name">Mon Tableau de bord</div>
+                <div class="tpl-badge" style="background:rgba(29,158,117,.14);color:#22c55e">Libre</div>
+              </button>
+              <button type="button" class="tpl-info" aria-expanded="false" aria-controls="tpl-desc-perso"
+                      aria-label="Que fait « Mon Tableau de bord » ?" onclick="fpToggleTplDesc(this)">?</button>
+              <div class="tpl-desc" id="tpl-desc-perso" role="region" hidden>
+                Canvas vierge, ou reprise d'un projet existant.
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -12254,6 +12297,26 @@ async function fpHistoryOpen(idx){
    (Firefox, Safari, ou permission refusée), on ne peut que rouvrir le
    sélecteur — et l'entrée le dit franchement plutôt que de faire croire à un
    raccourci qui n'en est pas un.                                          */
+
+/** Affiche ou masque la description d'une tuile Template.
+ *  Une seule ouverte à la fois : deux encarts flottants côte à côte se
+ *  gêneraient, et l'utilisateur compare rarement les deux textes. */
+function fpToggleTplDesc(btn){
+  const panel = document.getElementById(btn.getAttribute('aria-controls'));
+  if(!panel) return;
+  const opening = panel.hidden;
+  document.querySelectorAll('.tpl-desc').forEach(d => { d.hidden = true; });
+  document.querySelectorAll('.tpl-info').forEach(b => b.setAttribute('aria-expanded','false'));
+  panel.hidden = !opening;
+  btn.setAttribute('aria-expanded', String(opening));
+}
+
+// Un clic ailleurs referme l'encart : pas besoin de recliquer sur le « ? ».
+document.addEventListener('click', function(e){
+  if(e.target.closest && (e.target.closest('.tpl-info') || e.target.closest('.tpl-desc'))) return;
+  document.querySelectorAll('.tpl-desc:not([hidden])').forEach(d => { d.hidden = true; });
+  document.querySelectorAll('.tpl-info[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded','false'));
+});
 
 function fpRenderRecentFiles(){
   const block = document.getElementById('fp-recent-block');
