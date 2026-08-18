@@ -144,7 +144,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
      qu'une barre coupée hors écran. */
   min-width:0;overflow-x:auto;scrollbar-width:none}
 .tb-actions::-webkit-scrollbar{display:none}
-.source-pill{font-size:11px;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:4px 12px;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.source-pill{display:inline-flex;align-items:baseline;gap:7px;font-size:12px;color:var(--mid);
+  background:var(--card2);border:1px solid var(--border);border-radius:999px;padding:5px 14px;
+  white-space:nowrap;max-width:360px;overflow:hidden}
+.source-pill strong{font-weight:700;color:var(--dark);overflow:hidden;text-overflow:ellipsis}
+.source-pill span{color:var(--muted);font-size:11px;flex-shrink:0}
 .btn{border:1px solid var(--border);background:var(--card);color:var(--dark);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;font-family:'DM Sans',sans-serif}
 .btn:hover{border-color:var(--accent);color:var(--accent)}
 .btn-primary{background:var(--accent);color:var(--navy);border-color:var(--accent)}
@@ -395,8 +399,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
 #step-templates{flex:1;align-items:center;justify-content:center;padding:24px}
 .template-headline{text-align:center;margin-bottom:30px}
 .template-headline .hero-icon-badge{margin-bottom:16px}
-.template-context{display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:7px 14px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--mid);font-size:12px;box-shadow:0 8px 22px rgba(13,27,42,.045)}
-.template-context strong{color:var(--dark);font-weight:800}
 
 /* TEMPLATES */
 .template-section{max-width:1180px;margin:0 auto 28px}
@@ -902,7 +904,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
    navigation d'étapes (le fil d'étapes reste accessible par les boutons). */
 @media (max-width:920px){
   .steps-nav{display:none}
-  #source-pill{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #source-pill{max-width:190px}
   #topbar{padding:0 12px;gap:8px}
 }
 
@@ -1305,7 +1307,7 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
         <span class="af-orb">🧠</span>
         <span>Agent Analyste</span>
       </button>
-      <span class="source-pill" id="source-pill" style="display:none"></span>
+      <span class="source-pill" id="source-pill" style="display:none"><strong id="source-pill-name"></strong><span id="source-pill-meta"></span></span>
       <button class="btn" id="btn-back" style="display:none" onclick="prevStep()" data-i18n="btn_back">← Retour</button>
       <button class="btn btn-primary" id="btn-next" style="display:none" onclick="nextStep()">Suivant →</button>
       <button class="btn btn-dark" id="btn-export" style="display:none" onclick="exportHTML()">⬇ Export HTML</button>
@@ -1362,7 +1364,6 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
           <div class="step-kicker">ÉTAPE 2</div>
           <h2 class="step-title">TEMPLATE</h2>
           <p class="step-subtitle">Choisissez comment démarrer votre tableau de bord.</p>
-          <div class="template-context" id="template-source-context">Fichier chargé : <strong id="template-source-name">—</strong></div>
         </div>
 
         <!-- TEMPLATES -->
@@ -3413,9 +3414,6 @@ function goStep(n){
     if(b) b.className='step-btn'+(i===n?' active':i<n?' done':'');
   });
 
-  const sourceCtx=document.getElementById('template-source-name');
-  if(sourceCtx && sourceName) sourceCtx.textContent=sourceName;
-
   document.getElementById('btn-back').style.display=n>0?'':'none';
   document.getElementById('btn-next').style.display=((n===0&&rows.length)||(n===2&&rows.length)||(n===3&&widgets.length))?'':'none';
   document.getElementById('btn-export').style.display=n===4?'':'none';
@@ -3710,8 +3708,7 @@ function loadData(data,name,deferQuality){
   const redone = fpReapplyCalcColumns(name);
   if(redone.applied) buildFieldModel();
   sourceName=`${name} · ${data.length.toLocaleString()} lignes · ${columns.length} colonnes`;
-  document.getElementById('source-pill').textContent=sourceName;
-  document.getElementById('source-pill').style.display='';
+  fpSetSourcePill(name, data.length, columns.length);
   // Étape suivante : page de choix du template après le rapport qualité
   const openQuality = () => showQualityModal(name, ()=>{
     goStep(1);
@@ -3786,6 +3783,25 @@ function fpReapplyCalcColumns(fileName){
   }
   if(applied.length) clearAggregationCache();
   return { applied: applied.length, failed };
+}
+
+/** Pastille de la barre superieure : c'est le SEUL rappel du fichier charge
+ *  depuis que le doublon de l'ecran Template a ete retire. Le nom passe donc
+ *  en evidence, la volumetrie reste en retrait, et l'intitule complet est
+ *  disponible au survol quand la place manque. */
+function fpSetSourcePill(name, nRows, nCols){
+  const pill = document.getElementById('source-pill');
+  if(!pill) return;
+  const nameEl = document.getElementById('source-pill-name');
+  const metaEl = document.getElementById('source-pill-meta');
+  const meta = [
+    nRows ? nRows.toLocaleString('fr-FR') + ' lignes' : null,
+    nCols ? nCols + ' colonnes' : null,
+  ].filter(Boolean).join(' \u00b7 ');
+  if(nameEl) nameEl.textContent = name || '';
+  if(metaEl) metaEl.textContent = meta;
+  pill.title = [name, meta].filter(Boolean).join(' \u2014 ');
+  pill.style.display = '';
 }
 
 function loadDemo(){
@@ -11512,8 +11528,10 @@ function restoreState(state) {
       if (typeof clearAggregationCache === 'function') clearAggregationCache();
       if (typeof buildFieldModel === 'function') { try { buildFieldModel(); } catch(e2) {} }
       sourceName = state.sourceName || (state.fileName ? state.fileName + ' · ' + rows.length.toLocaleString() + ' lignes' : 'Projet restauré');
-      const pill = document.getElementById('source-pill');
-      if (pill) { pill.textContent = sourceName; pill.style.display = ''; }
+      if (typeof fpSetSourcePill === 'function') {
+        fpSetSourcePill(state.fileName || state.sourceName || 'Projet', rows.length,
+                        (typeof columns !== 'undefined' ? columns.length : 0));
+      }
     }
     if (state.appName) { const el = document.getElementById('app-name'); if (el) el.value = state.appName; }
     if (typeof goStep === 'function') goStep(3);
