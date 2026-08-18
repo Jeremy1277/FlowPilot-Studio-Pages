@@ -3447,6 +3447,12 @@ function fpLoadUI(show, phase, sub){
   if(sb) sb.textContent=sub||'';
 }
 function fpLoadYield(){ return new Promise(r=>setTimeout(r,30)); }
+/** Résout une fois que le navigateur a réellement peint la dernière valeur.
+ *  Un simple setTimeout ne suffit pas : la barre a une transition CSS, et sans
+ *  cette attente le 100 % n'apparaît jamais à l'écran. */
+function fpLoadPainted(){
+  return new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r())));
+}
 
 // ── Worker XLSX : le parsing tourne hors du fil principal ────────────────
 let _xlsxWorker;
@@ -3572,14 +3578,22 @@ async function loadSheetFromSource(source, sheetInfo, fileName, showSheetInName)
     }
     if(!parsed.length){ fpLoadUI(false); toast(window.FP_t?window.FP_t('toast_empty_file'):'⚠ Feuille vide'); return; }
     fpNormalizeRowDates(parsed);   // corrige la dérive de XLSX.js avant tout typage
-    fpLoadSetPct(90);
-    fpLoadUI(true,'Finalisation…','Détection des types de colonnes');
-    fpLoadCreep(98);
+    fpLoadSetPct(92);
+    fpLoadUI(true,'Finalisation','Détection des types de colonnes');
+    fpLoadCreep(97);
     await fpLoadYield();
-    loadData(parsed, showSheetInName?fileName+' — '+sheetInfo.name:fileName);
+
+    // Le typage et la réapplication des colonnes calculées bloquent le fil
+    // principal : la barre ne peut pas se peindre pendant. On la fige donc à
+    // un palier honnête, on fait le travail, PUIS on affiche le 100 %.
+    const openQuality = loadData(parsed, showSheetInName?fileName+' — '+sheetInfo.name:fileName, true);
+
     fpLoadSetPct(100);
-    await new Promise(r=>setTimeout(r,180)); // laisse voir le 100 %
+    fpLoadUI(true,'Terminé', (parsed.length.toLocaleString('fr-FR'))+' lignes prêtes');
+    await fpLoadPainted();                   // on attend le rendu réel du 100 %
+    await new Promise(r=>setTimeout(r,260)); // et on le laisse à l'écran
     fpLoadUI(false);
+    if(typeof openQuality === 'function') openQuality();
     try{ fpHistoryAdd({name:fileName, sheet:showSheetInName?sheetInfo.name:null,
       rows:parsed.length, size:(window.__fpLastFileMeta&&window.__fpLastFileMeta.size)||null,
       date:Date.now()}, window.__fpLastFileMeta&&window.__fpLastFileMeta.handle);
@@ -3637,7 +3651,13 @@ function showSheetPicker(fileName,source,sheets){
     if(card){card.style.transform='';card.style.borderColor='var(--border)';card.style.boxShadow='0 1px 3px rgba(13,27,42,.07)';}
   });
 }
-function loadData(data,name){
+/**
+ * @param {boolean} [deferQuality] si vrai, n'ouvre pas le rapport qualité et
+ *        renvoie la fonction qui l'ouvrira. Permet à l'appelant de fermer
+ *        d'abord la fenêtre de chargement : sans ça, l'écran suivant s'affiche
+ *        avant que la barre ait pu peindre son 100 %.
+ */
+function loadData(data,name,deferQuality){
   clearAggregationCache();
   rows=data; colAliases={}; colDateFormats={}; colDisplayFormats={}; widgets=[]; selectedTemplateId=null;
   columns=Object.keys(data[0]).map(n=>({name:n,type:detectType(data.slice(0,50).map(r=>r[n]),n)}));
@@ -3650,12 +3670,14 @@ function loadData(data,name){
   document.getElementById('source-pill').textContent=sourceName;
   document.getElementById('source-pill').style.display='';
   // Étape suivante : page de choix du template après le rapport qualité
-  showQualityModal(name, ()=>{
+  const openQuality = () => showQualityModal(name, ()=>{
     goStep(1);
     toast(window.FP_t?window.FP_t('toast_data_loaded'):'Données chargées — choisis maintenant ton template');
     if(redone.applied) toast(redone.applied + ' colonne(s) calculée(s) réappliquée(s)');
     if(redone.failed.length) toast('Non réappliquée(s) : ' + redone.failed.join(', '));
   });
+  if(deferQuality) return openQuality;
+  openQuality();
 }
 
 /* ── Colonnes calculées : mémoire par fichier ────────────────────────────
