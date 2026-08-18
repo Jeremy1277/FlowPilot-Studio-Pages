@@ -1452,6 +1452,8 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
         <div role="tablist" style="display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--border);flex:0 0 auto">
           <button role="tab" id="calc-tab-btn-sugg" aria-controls="calc-tab-sugg" aria-selected="true"
                   onclick="calcColTab('sugg')" class="calc-tab calc-tab-on">Suggestions</button>
+          <button role="tab" id="calc-tab-btn-assist" aria-controls="calc-tab-assist" aria-selected="false"
+                  onclick="calcColTab('assist')" class="calc-tab">Créer moi-même</button>
           <button role="tab" id="calc-tab-btn-formule" aria-controls="calc-tab-formule" aria-selected="false"
                   onclick="calcColTab('formule')" class="calc-tab">Formule</button>
         </div>
@@ -1465,6 +1467,18 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
             <div id="calc-sugg-empty" style="display:none;font-size:12px;color:var(--muted);padding:18px 0;text-align:center">
               Rien à proposer sur ce fichier. Passe par l'onglet <strong>Formule</strong> pour écrire la tienne.
             </div>
+          </div>
+
+          <!-- ── Onglet Assistant guidé ───────────────────────────────── -->
+          <div id="calc-tab-assist" role="tabpanel" aria-labelledby="calc-tab-btn-assist" style="display:none">
+            <div style="font-size:12px;color:var(--mid);margin-bottom:12px">
+              Choisis ce que tu veux faire, remplis les champs : la colonne se construit toute seule.
+            </div>
+            <label for="calc-op-select" style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);display:block;margin-bottom:6px">Opération</label>
+            <select id="calc-op-select" onchange="calcColOpChanged()"
+              style="width:100%;border:1px solid var(--border);border-radius:9px;padding:9px 10px;font-size:12.5px;font-family:'DM Sans',sans-serif;background:var(--card);color:var(--dark);outline:none"></select>
+            <div id="calc-op-hint" style="display:none;font-size:11px;color:var(--mid);margin-top:6px;line-height:1.45"></div>
+            <div id="calc-op-inputs" style="display:grid;gap:10px;margin-top:14px"></div>
           </div>
 
           <!-- ── Onglet Formule ───────────────────────────────────────── -->
@@ -1504,6 +1518,7 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
           <div id="calc-col-namerow" style="display:none;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap">
             <label for="calc-col-name" style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">Nom de la colonne</label>
             <input id="calc-col-name" type="text" placeholder="ex. Type de remorque"
+              oninput="this.dataset.auto=''"
               style="flex:1;min-width:180px;border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none"/>
           </div>
         </div>
@@ -11577,7 +11592,7 @@ function calcColEl(id){ return document.getElementById(id); }
 
 function calcColTab(tab){
   _calcColTab = tab;
-  ['sugg','formule'].forEach(t => {
+  ['sugg','assist','formule'].forEach(t => {
     const panel = calcColEl('calc-tab-' + t);
     const btn   = calcColEl('calc-tab-btn-' + t);
     if(panel) panel.style.display = (t === tab) ? '' : 'none';
@@ -11597,6 +11612,8 @@ function calcColReset(){
   _calcColSource   = null;
   const hide = id => { const e = calcColEl(id); if(e) e.style.display = 'none'; };
   hide('calc-col-preview'); hide('calc-col-err'); hide('calc-col-apply-btn'); hide('calc-col-namerow');
+  const nameInput = calcColEl('calc-col-name');
+  if(nameInput && nameInput.dataset.auto === '1'){ nameInput.value = ''; delete nameInput.dataset.auto; }
   document.querySelectorAll('.calc-sugg-on').forEach(el => el.classList.remove('calc-sugg-on'));
 }
 
@@ -11612,11 +11629,13 @@ function openCalcColModal(){
   if(!modal) return;
   modal.style.display = 'flex';
   const input = calcColEl('calc-col-manual-input'); if(input) input.value = '';
-  const name  = calcColEl('calc-col-name');         if(name)  name.value  = '';
+  const name  = calcColEl('calc-col-name');
+  if(name){ name.value = ''; delete name.dataset.auto; }
   const help  = calcColEl('calc-col-fnhelp');       if(help)  help.style.display = 'none';
   const cols  = calcColEl('calc-col-collist');      if(cols)  cols.style.display = 'none';
   calcColTab('sugg');
   renderCalcSuggestions();
+  buildOperationPicker();
 }
 
 function closeCalcColModal(){
@@ -11678,7 +11697,7 @@ function calcColPickSuggestion(i){
   _calcColCompiled = sg.compiled;
   _calcColSource   = sg.sourceColumn || null;
   const nameInput  = calcColEl('calc-col-name');
-  if(nameInput) nameInput.value = sg.name;
+  if(nameInput){ nameInput.value = sg.name; nameInput.dataset.auto = '1'; }
   calcColShowPreview(sg.formula);
 }
 
@@ -11756,6 +11775,133 @@ function calcColShowPreview(displayFormula){
   box.style.display = '';
   const nameRow = calcColEl('calc-col-namerow'); if(nameRow) nameRow.style.display = 'flex';
   const apply   = calcColEl('calc-col-apply-btn'); if(apply) apply.style.display = '';
+}
+
+/* ── Assistant guidé ─────────────────────────────────────────────────────
+   L'utilisateur choisit une opération et remplit des champs ; la formule est
+   fabriquée par widgets/suggest-columns.js. Aucune syntaxe n'apparaît tant
+   qu'il ne la demande pas — mais elle reste visible dans l'aperçu, ce qui
+   apprend le langage à ceux que ça intéresse sans l'imposer aux autres.   */
+
+let _calcOpValues = {};
+
+function calcOperations(){ return window.FP_OPERATIONS || []; }
+
+function buildOperationPicker(){
+  const sel = calcColEl('calc-op-select');
+  if(!sel) return;
+  const ops = calcOperations();
+  if(!ops.length){ sel.innerHTML = '<option>Indisponible</option>'; return; }
+
+  const byCat = {};
+  ops.forEach((op, i) => { (byCat[op.category] = byCat[op.category] || []).push({ op, i }); });
+  sel.innerHTML = Object.keys(byCat).map(cat =>
+    `<optgroup label="${esc(cat)}">` +
+    byCat[cat].map(({ op, i }) => `<option value="${i}">${esc(op.label)}</option>`).join('') +
+    `</optgroup>`
+  ).join('');
+  sel.value = '0';
+  calcColOpChanged();
+}
+
+function calcColOpChanged(){
+  _calcOpValues = {};
+  calcColReset();
+  renderOperationInputs();
+}
+
+/** Rend les champs déclarés par l'opération choisie. */
+function renderOperationInputs(){
+  const sel  = calcColEl('calc-op-select');
+  const box  = calcColEl('calc-op-inputs');
+  const hint = calcColEl('calc-op-hint');
+  if(!sel || !box) return;
+  const op = calcOperations()[parseInt(sel.value, 10)];
+  if(!op){ box.innerHTML = ''; return; }
+
+  if(hint){
+    hint.textContent = op.hint || '';
+    hint.style.display = op.hint ? '' : 'none';
+  }
+
+  const label = txt =>
+    `<div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:4px">${esc(txt)}</div>`;
+  const field = 'width:100%;border:1px solid var(--border);border-radius:9px;padding:8px 10px;'
+    + "font-size:12.5px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;background:var(--card);color:var(--dark)";
+
+  box.innerHTML = op.inputs.map(inp => {
+    const id = 'calc-op-in-' + inp.key;
+    if(inp.kind === 'column'){
+      const usable = columns.filter(c =>
+        inp.accept === 'any' ? true :
+        inp.accept === 'date' ? c.type === 'date' :
+        inp.accept === 'number' ? c.type === 'number' : true);
+      if(!usable.length){
+        return `<div>${label(inp.label)}<div style="font-size:11.5px;color:var(--coral)">Aucune colonne de ce type dans ce fichier.</div></div>`;
+      }
+      return `<div>${label(inp.label)}<select id="${id}" data-key="${esc(inp.key)}" onchange="calcColInputChanged()" style="${field}">`
+        + `<option value="">— choisir —</option>`
+        + usable.map(c => `<option value="${esc(c.name)}">${esc(c.name)}</option>`).join('')
+        + `</select></div>`;
+    }
+    if(inp.kind === 'select'){
+      return `<div>${label(inp.label)}<select id="${id}" data-key="${esc(inp.key)}" onchange="calcColInputChanged()" style="${field}">`
+        + inp.options.map(o => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join('')
+        + `</select></div>`;
+    }
+    if(inp.kind === 'number'){
+      const attrs = (inp.min != null ? ` min="${inp.min}"` : '') + (inp.max != null ? ` max="${inp.max}"` : '');
+      return `<div>${label(inp.label)}<input id="${id}" data-key="${esc(inp.key)}" type="number"${attrs}`
+        + ` value="${inp.value != null ? esc(inp.value) : ''}" oninput="calcColInputChanged()" style="${field}"/></div>`;
+    }
+    return `<div>${label(inp.label)}<input id="${id}" data-key="${esc(inp.key)}" type="text"`
+      + ` placeholder="${esc(inp.placeholder || '')}" value="${inp.value != null ? esc(inp.value) : ''}"`
+      + ` oninput="calcColInputChanged()" style="${field}"/></div>`;
+  }).join('');
+
+  // Les valeurs par défaut comptent comme saisies : l'aperçu peut apparaître
+  // dès qu'il ne manque que le choix d'une colonne.
+  op.inputs.forEach(inp => {
+    const el = calcColEl('calc-op-in-' + inp.key);
+    if(el && el.value !== '') _calcOpValues[inp.key] = el.value;
+  });
+  calcColInputChanged();
+}
+
+/** Recalcule la formule à chaque frappe : l'aperçu suit la saisie. */
+function calcColInputChanged(){
+  const sel = calcColEl('calc-op-select');
+  const op  = calcOperations()[parseInt(sel ? sel.value : '-1', 10)];
+  if(!op) return;
+
+  _calcOpValues = {};
+  document.querySelectorAll('#calc-op-inputs [data-key]').forEach(el => {
+    if(el.value !== '') _calcOpValues[el.dataset.key] = el.value;
+  });
+
+  let built = null;
+  try { built = window.FP_buildOperation ? window.FP_buildOperation(op, _calcOpValues) : null; }
+  catch(e){ built = null; }
+
+  // Entrées encore incomplètes : on n'affiche ni erreur ni aperçu.
+  if(!built){ calcColReset(); return; }
+
+  const compiled = fpCompileCalcCol(built.formula);
+  if(!compiled.ok){
+    calcColReset();
+    calcColError(compiled.error.message);
+    return;
+  }
+
+  const nameInput = calcColEl('calc-col-name');
+  const untouched = !nameInput.value || nameInput.dataset.auto === '1';
+  _calcColCompiled = compiled;
+  _calcColSource   = built.sourceColumn;
+  calcColShowPreview(built.formula);
+  if(untouched && nameInput){
+    nameInput.value = built.name;
+    nameInput.dataset.auto = '1';
+  }
 }
 
 /* ── Aides en ligne ──────────────────────────────────────────────────── */
@@ -12073,7 +12219,7 @@ import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widget
 import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js';
 import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js';
 import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js';
-import { suggestColumns, previewFormula } from './widgets/suggest-columns.js';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
@@ -12086,6 +12232,8 @@ window.FP_periodLabel      = periodLabel;
 window.FP_TIME_COMPARE_MODES = TIME_COMPARE_MODES;
 window.FP_TIME_CUMUL_MODES   = TIME_CUMUL_MODES;
 window.FP_suggestColumns   = suggestColumns;
+window.FP_OPERATIONS       = OPERATIONS;
+window.FP_buildOperation   = buildOperation;
 window.FP_previewFormula   = previewFormula;
 window.FP_compileFormula   = compileFormula;
 window.FP_FORMULA_FUNCTIONS= FORMULA_FUNCTIONS;

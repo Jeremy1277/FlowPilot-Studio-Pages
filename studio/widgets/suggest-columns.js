@@ -82,7 +82,8 @@ const RULES = [
       category: 'Dates',
       label: 'Délai en jours',
       name: 'Délai (jours)',
-      formula: `DATEDIFF(${ref(from.name)}, ${ref(to.name)}, "day")`,
+      // DATEDIFF(a, b) vaut a − b : pour un délai positif, la date de FIN vient en premier.
+      formula: `DATEDIFF(${ref(to.name)}, ${ref(from.name)}, "day")`,
       why: `Nombre de jours entre « ${from.name} » et « ${to.name} ».`,
     }];
   },
@@ -441,3 +442,309 @@ export function suggestColumns({ columns, rows, compile, helpers }) {
 }
 
 export const SUGGEST_LIMITS = { SAMPLE_SIZE, MIN_FILL_RATIO, MAX_SUGGESTIONS, DISTINCT_TABLE_MAX };
+
+/* ===========================================================================
+   ASSISTANT GUIDÉ — catalogue d'opérations
+
+   Les suggestions couvrent ce que l'application sait deviner. L'assistant
+   couvre le reste sans passer par la syntaxe : l'utilisateur choisit une
+   opération, remplit des champs, et la formule est fabriquée pour lui.
+
+   Chaque opération déclare ses entrées ; l'interface les rend automatiquement.
+   Aucune connaissance du langage n'est requise côté UI : ajouter une opération
+   ici suffit à la faire apparaître dans l'assistant.
+
+   Types d'entrée :
+     column  — liste déroulante des colonnes, filtrée par `accept`
+     text    — champ libre (échappé avant insertion dans la formule)
+     number  — champ numérique
+     select  — liste de valeurs imposées
+   =========================================================================== */
+
+/** Échappe un texte saisi par l'utilisateur pour l'insérer en littéral. */
+function lit(v) {
+  return '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+}
+
+/** Nombre sûr : jamais d'injection possible via un champ numérique. */
+function numLit(v) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? String(n) : '0';
+}
+
+export const OPERATIONS = [
+
+  /* ── Texte ──────────────────────────────────────────────────────────── */
+  {
+    id: 'retirer_texte', category: 'Texte',
+    label: 'Retirer un morceau de texte',
+    hint: 'Supprime toutes les occurrences d\u2019un texte : préfixe technique, code, séparateur…',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'any', label: 'Dans la colonne' },
+      { key: 'txt', kind: 'text', label: 'Retirer', placeholder: 'L_TRUCK_', required: true },
+    ],
+    name: v => `${v.colName} (net)`,
+    build: v => `REPLACE(TEXT(${v.col}), ${lit(v.txt)}, "")`,
+  },
+  {
+    id: 'remplacer_texte', category: 'Texte',
+    label: 'Remplacer un texte par un autre',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'any', label: 'Dans la colonne' },
+      { key: 'from', kind: 'text', label: 'Remplacer', required: true },
+      { key: 'to', kind: 'text', label: 'Par' },
+    ],
+    name: v => `${v.colName} (corrigé)`,
+    build: v => `REPLACE(TEXT(${v.col}), ${lit(v.from)}, ${lit(v.to)})`,
+  },
+  {
+    id: 'debut_fin', category: 'Texte',
+    label: 'Extraire le début ou la fin',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'any', label: 'Dans la colonne' },
+      { key: 'side', kind: 'select', label: 'Prendre', options: [
+        { value: 'left', label: 'les premiers caractères' },
+        { value: 'right', label: 'les derniers caractères' },
+      ] },
+      { key: 'n', kind: 'number', label: 'Combien', value: 2, min: 1, max: 200 },
+    ],
+    name: v => `${v.colName} (extrait)`,
+    build: v => `${v.side === 'right' ? 'RIGHT' : 'LEFT'}(TEXT(${v.col}), ${numLit(v.n)})`,
+  },
+  {
+    id: 'decouper', category: 'Texte',
+    label: 'Découper sur un séparateur',
+    hint: 'Prend le n-ième morceau, par exemple la ville dans « 57000 - METZ ».',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'any', label: 'Dans la colonne' },
+      { key: 'sep', kind: 'text', label: 'Séparateur', placeholder: '-', required: true },
+      { key: 'n', kind: 'number', label: 'Quel morceau', value: 1, min: 1, max: 20 },
+    ],
+    name: v => `${v.colName} (morceau ${v.n})`,
+    build: v => `TRIM(SPLIT(TEXT(${v.col}), ${lit(v.sep)}, ${numLit(v.n)}))`,
+  },
+  {
+    id: 'casse', category: 'Texte',
+    label: 'Harmoniser la casse',
+    hint: 'Utile quand « Metz », « METZ » et « metz » coexistent et comptent pour trois.',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'any', label: 'Dans la colonne' },
+      { key: 'mode', kind: 'select', label: 'Mettre en', options: [
+        { value: 'upper', label: 'MAJUSCULES' },
+        { value: 'lower', label: 'minuscules' },
+      ] },
+    ],
+    name: v => `${v.colName} (uniformisé)`,
+    build: v => `${v.mode === 'lower' ? 'LOWER' : 'UPPER'}(TRIM(TEXT(${v.col})))`,
+  },
+  {
+    id: 'coller', category: 'Texte',
+    label: 'Coller deux colonnes',
+    inputs: [
+      { key: 'a', kind: 'column', accept: 'any', label: 'Première colonne' },
+      { key: 'sep', kind: 'text', label: 'Séparateur', placeholder: ' - ', value: ' ' },
+      { key: 'b', kind: 'column', accept: 'any', label: 'Deuxième colonne' },
+    ],
+    name: v => `${v.aName} + ${v.bName}`,
+    build: v => `CONCAT(TEXT(${v.a}), ${lit(v.sep)}, TEXT(${v.b}))`,
+  },
+  {
+    id: 'contient', category: 'Texte',
+    label: 'Marquer si le texte contient…',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'any', label: 'Dans la colonne' },
+      { key: 'txt', kind: 'text', label: 'Contient', required: true },
+      { key: 'yes', kind: 'text', label: 'Alors écrire', value: 'Oui' },
+      { key: 'no', kind: 'text', label: 'Sinon écrire', value: 'Non' },
+    ],
+    name: v => `Contient ${v.txt || '…'}`,
+    build: v => `IF(CONTAINS(TEXT(${v.col}), ${lit(v.txt)}), ${lit(v.yes)}, ${lit(v.no)})`,
+  },
+
+  /* ── Dates ──────────────────────────────────────────────────────────── */
+  {
+    id: 'periode', category: 'Dates',
+    label: 'Extraire une période',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'date', label: 'À partir de la date' },
+      { key: 'grain', kind: 'select', label: 'Extraire', options: [
+        { value: 'year', label: 'l\u2019année (2025)' },
+        { value: 'month', label: 'le mois (2025-03)' },
+        { value: 'quarter', label: 'le trimestre (T1 2025)' },
+        { value: 'week', label: 'la semaine ISO (12)' },
+        { value: 'weekday', label: 'le jour de semaine (1 = lundi)' },
+        { value: 'day', label: 'le jour du mois' },
+      ] },
+    ],
+    name: v => ({ year: 'Année', month: 'Mois', quarter: 'Trimestre', week: 'Semaine', weekday: 'Jour de semaine', day: 'Jour' })[v.grain] || 'Période',
+    build: v => {
+      switch (v.grain) {
+        case 'month':   return `FORMATDATE(${v.col}, "YYYY-MM")`;
+        case 'quarter': return `CONCAT("T", TEXT(QUARTER(${v.col})), " ", TEXT(YEAR(${v.col})))`;
+        case 'week':    return `WEEK(${v.col})`;
+        case 'weekday': return `WEEKDAY(${v.col})`;
+        case 'day':     return `DAY(${v.col})`;
+        default:        return `YEAR(${v.col})`;
+      }
+    },
+  },
+  {
+    id: 'ecart_dates', category: 'Dates',
+    label: 'Écart entre deux dates',
+    inputs: [
+      { key: 'from', kind: 'column', accept: 'date', label: 'De' },
+      { key: 'to', kind: 'column', accept: 'date', label: 'À' },
+      { key: 'unit', kind: 'select', label: 'En', options: [
+        { value: 'day', label: 'jours' },
+        { value: 'week', label: 'semaines' },
+        { value: 'month', label: 'mois' },
+        { value: 'year', label: 'années' },
+      ] },
+    ],
+    name: v => `Écart (${({ day: 'jours', week: 'semaines', month: 'mois', year: 'années' })[v.unit] || 'jours'})`,
+    // DATEDIFF(a, b) vaut a − b : « De X à Y » doit donner Y − X.
+    build: v => `DATEDIFF(${v.to}, ${v.from}, ${lit(v.unit)})`,
+  },
+  {
+    id: 'anciennete', category: 'Dates',
+    label: 'Ancienneté (jours écoulés)',
+    inputs: [{ key: 'col', kind: 'column', accept: 'date', label: 'Depuis la date' }],
+    name: () => 'Jours écoulés',
+    build: v => `DAYS_SINCE(${v.col})`,
+  },
+
+  /* ── Calculs ────────────────────────────────────────────────────────── */
+  {
+    id: 'operation', category: 'Calculs',
+    label: 'Combiner deux colonnes',
+    inputs: [
+      { key: 'a', kind: 'column', accept: 'number', label: 'Colonne' },
+      { key: 'op', kind: 'select', label: 'Opération', options: [
+        { value: '-', label: 'moins (−)' },
+        { value: '+', label: 'plus (+)' },
+        { value: '*', label: 'multiplié par (×)' },
+        { value: '/', label: 'divisé par (÷)' },
+      ] },
+      { key: 'b', kind: 'column', accept: 'number', label: 'Colonne' },
+      { key: 'dec', kind: 'number', label: 'Décimales', value: 2, min: 0, max: 6 },
+    ],
+    name: v => ({ '-': 'Écart', '+': 'Total', '*': 'Produit', '/': 'Ratio' })[v.op] || 'Calcul',
+    // La division est protégée : un diviseur nul renverrait null et viderait la colonne.
+    build: v => v.op === '/'
+      ? `IF(${v.b} > 0, ROUND(${v.a} / ${v.b}, ${numLit(v.dec)}), 0)`
+      : `ROUND(${v.a} ${v.op} ${v.b}, ${numLit(v.dec)})`,
+  },
+  {
+    id: 'pourcentage', category: 'Calculs',
+    label: 'Pourcentage d\u2019une colonne sur une autre',
+    inputs: [
+      { key: 'part', kind: 'column', accept: 'number', label: 'Part' },
+      { key: 'total', kind: 'column', accept: 'number', label: 'Sur le total' },
+      { key: 'dec', kind: 'number', label: 'Décimales', value: 1, min: 0, max: 4 },
+    ],
+    name: v => `${v.partName} / ${v.totalName} %`,
+    build: v => `IF(${v.total} > 0, ROUND(${v.part} / ${v.total} * 100, ${numLit(v.dec)}), 0)`,
+  },
+  {
+    id: 'arrondi', category: 'Calculs',
+    label: 'Arrondir une valeur',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'number', label: 'Colonne' },
+      { key: 'dec', kind: 'number', label: 'Décimales', value: 0, min: 0, max: 6 },
+    ],
+    name: v => `${v.colName} (arrondi)`,
+    build: v => `ROUND(${v.col}, ${numLit(v.dec)})`,
+  },
+
+  /* ── Classement ─────────────────────────────────────────────────────── */
+  {
+    id: 'seuil', category: 'Classement',
+    label: 'Classer selon un seuil',
+    hint: 'Deux catégories, séparées par une valeur limite.',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'number', label: 'Colonne' },
+      { key: 'cmp', kind: 'select', label: 'Est', options: [
+        { value: '>', label: 'supérieure à' },
+        { value: '>=', label: 'supérieure ou égale à' },
+        { value: '<', label: 'inférieure à' },
+        { value: '<=', label: 'inférieure ou égale à' },
+      ] },
+      { key: 'seuil', kind: 'number', label: 'Seuil', value: 0 },
+      { key: 'yes', kind: 'text', label: 'Alors', value: 'Au-dessus' },
+      { key: 'no', kind: 'text', label: 'Sinon', value: 'En dessous' },
+    ],
+    name: v => `${v.colName} (classé)`,
+    build: v => `IF(${v.col} ${v.cmp} ${numLit(v.seuil)}, ${lit(v.yes)}, ${lit(v.no)})`,
+  },
+  {
+    id: 'trois_tranches', category: 'Classement',
+    label: 'Classer en trois tranches',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'number', label: 'Colonne' },
+      { key: 's1', kind: 'number', label: 'Premier seuil', value: 0 },
+      { key: 's2', kind: 'number', label: 'Second seuil', value: 0 },
+      { key: 'l1', kind: 'text', label: 'En dessous', value: 'Faible' },
+      { key: 'l2', kind: 'text', label: 'Entre les deux', value: 'Moyen' },
+      { key: 'l3', kind: 'text', label: 'Au-dessus', value: 'Élevé' },
+    ],
+    name: v => `${v.colName} (tranche)`,
+    build: v => `IF(${v.col} <= ${numLit(v.s1)}, ${lit(v.l1)}, IF(${v.col} <= ${numLit(v.s2)}, ${lit(v.l2)}, ${lit(v.l3)}))`,
+  },
+  {
+    id: 'egal', category: 'Classement',
+    label: 'Renommer une valeur précise',
+    hint: 'Par exemple : remplacer « L_TRUCK » par « Standard », le reste inchangé.',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'any', label: 'Dans la colonne' },
+      { key: 'val', kind: 'text', label: 'Si la valeur est', required: true },
+      { key: 'yes', kind: 'text', label: 'Écrire', required: true },
+    ],
+    name: v => `${v.colName} (renommé)`,
+    build: v => `IF(TEXT(${v.col}) == ${lit(v.val)}, ${lit(v.yes)}, TEXT(${v.col}))`,
+  },
+  {
+    id: 'combler', category: 'Classement',
+    label: 'Combler les cases vides',
+    inputs: [
+      { key: 'col', kind: 'column', accept: 'any', label: 'Dans la colonne' },
+      { key: 'val', kind: 'text', label: 'Mettre à la place', value: 'Non renseigné' },
+    ],
+    name: v => `${v.colName} (complété)`,
+    build: v => `COALESCE(${v.col}, ${lit(v.val)})`,
+  },
+];
+
+/**
+ * Fabrique la formule d'une opération à partir des valeurs saisies.
+ * Retourne null si une entrée obligatoire manque — l'UI n'affiche alors
+ * simplement pas encore d'aperçu, sans message d'erreur intempestif.
+ *
+ * @returns {{formula:string, name:string, sourceColumn:string|null}|null}
+ */
+export function buildOperation(op, values) {
+  if (!op) return null;
+  const v = {};
+  let firstColumn = null;
+
+  for (const input of op.inputs) {
+    let raw = values[input.key];
+    if (raw === undefined || raw === null || raw === '') {
+      if (input.required) return null;        // saisie indispensable, encore absente
+      if (input.kind === 'text') raw = ('value' in input) ? input.value : '';
+      else if (input.kind === 'number' && 'value' in input) raw = input.value;
+      else if (input.kind === 'select') raw = input.options[0].value;
+      else return null;                       // colonne non choisie : rien à construire
+    }
+    if (input.kind === 'column') {
+      v[input.key] = '[' + String(raw).replace(/]/g, '') + ']';
+      v[input.key + 'Name'] = String(raw);
+      if (!firstColumn) firstColumn = String(raw);
+    } else {
+      v[input.key] = raw;
+    }
+  }
+
+  const formula = op.build(v);
+  const name = typeof op.name === 'function' ? op.name(v) : (op.label || 'Colonne calculée');
+  return { formula, name: String(name).trim(), sourceColumn: firstColumn };
+}
