@@ -1309,6 +1309,12 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
             <input type="file" id="file-input" accept=".xlsx,.xls,.xlsm,.csv" style="display:none" onchange="handleFile(this.files[0])"/>
           </div>
 
+          <!-- Fichiers récents : réouverture directe du fichier, données à jour -->
+          <div id="fp-recent-block" style="display:none;margin-top:14px">
+            <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:8px">Fichiers récents</div>
+            <div id="fp-recent-list" style="display:grid;gap:7px"></div>
+          </div>
+
           <div class="file-type-row">
             <span class="file-type-label" data-i18n="data_formats_allowed">Formats autorisés</span>
             <span class="file-type-pill">.XLSX</span>
@@ -1978,6 +1984,15 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
   }
   window.skipIntroSplash = closeIntro;
 
+  // La liste des fichiers récents est peuplée dès le départ : c'est le premier
+  // écran, et c'est là qu'elle sert.
+  if(document.readyState !== 'loading') setTimeout(function(){
+    if(typeof fpRenderRecentFiles === 'function') fpRenderRecentFiles();
+  }, 0);
+  else document.addEventListener('DOMContentLoaded', function(){
+    if(typeof fpRenderRecentFiles === 'function') fpRenderRecentFiles();
+  });
+
   var bar    = document.getElementById('fp-bar'),
       pctEl  = document.getElementById('fp-pct'),
       dot    = document.getElementById('fp-dot'),
@@ -2029,7 +2044,7 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
 // ── STATE ────────────────────────────────────────────────────────────────
 let rows=[], columns=[], widgets=[], colAliases={}, colDateFormats={}, colDisplayFormats={}, currentStep=0;
 let fieldModels={}, selectedTemplateId=null;
-let sourceName='', editingId=null, renamingCol=null, dateFormatCol=null, selectedDateFmt=null, dataTypeCol=null, selectedDataType=null, appAccent='#EF9F27';
+let sourceName='', sourceNameFile='', editingId=null, renamingCol=null, dateFormatCol=null, selectedDateFmt=null, dataTypeCol=null, selectedDataType=null, appAccent='#EF9F27';
 
 const DATE_FORMATS=[
   {id:'day',     icon:'📆', label:'Jour',       example:'2026-03-14',    badge:'JJ/MM/AAAA'},
@@ -3525,7 +3540,14 @@ async function fpProcessWorkbook(buf, file){
     if(usable.length===0){ fpLoadUI(false); toast(window.FP_t?window.FP_t('toast_empty_file'):'⚠ Fichier vide'); return; }
     if(usable.length===1){
       loadSheetFromSource(source, usable[0], file.name, false);
+    } else if(window.__fpPreferSheet && usable.some(sh=>sh.name===window.__fpPreferSheet)){
+      // Réouverture d'un fichier récent : on reprend la feuille déjà choisie
+      // plutôt que de reposer la question à chaque fois.
+      const wanted=usable.find(sh=>sh.name===window.__fpPreferSheet);
+      window.__fpPreferSheet=null;
+      loadSheetFromSource(source, wanted, file.name, true);
     } else {
+      window.__fpPreferSheet=null;
       fpLoadUI(false);
       showSheetPicker(file.name, source, sheets);
     }
@@ -3560,7 +3582,8 @@ async function loadSheetFromSource(source, sheetInfo, fileName, showSheetInName)
     fpLoadUI(false);
     try{ fpHistoryAdd({name:fileName, sheet:showSheetInName?sheetInfo.name:null,
       rows:parsed.length, size:(window.__fpLastFileMeta&&window.__fpLastFileMeta.size)||null,
-      date:Date.now()}, window.__fpLastFileMeta&&window.__fpLastFileMeta.handle); }catch(e){}
+      date:Date.now()}, window.__fpLastFileMeta&&window.__fpLastFileMeta.handle);
+      if(typeof fpRenderRecentFiles==='function') fpRenderRecentFiles(); }catch(e){}
   }catch(err){
     fpLoadUI(false);
     toast('⚠ Erreur: '+err.message);
@@ -3619,14 +3642,85 @@ function loadData(data,name){
   rows=data; colAliases={}; colDateFormats={}; colDisplayFormats={}; widgets=[]; selectedTemplateId=null;
   columns=Object.keys(data[0]).map(n=>({name:n,type:detectType(data.slice(0,50).map(r=>r[n]),n)}));
   buildFieldModel();
+  sourceNameFile = name;
+  // Les colonnes calculées de ce fichier sont rejouées sur les données fraîches.
+  const redone = fpReapplyCalcColumns(name);
+  if(redone.applied) buildFieldModel();
   sourceName=`${name} · ${data.length.toLocaleString()} lignes · ${columns.length} colonnes`;
   document.getElementById('source-pill').textContent=sourceName;
   document.getElementById('source-pill').style.display='';
   // Étape suivante : page de choix du template après le rapport qualité
   showQualityModal(name, ()=>{
     goStep(1);
-    toast(window.FP_t?window.FP_t('toast_data_loaded'):'✓ Données chargées — choisis maintenant ton template');
+    toast(window.FP_t?window.FP_t('toast_data_loaded'):'Données chargées — choisis maintenant ton template');
+    if(redone.applied) toast(redone.applied + ' colonne(s) calculée(s) réappliquée(s)');
+    if(redone.failed.length) toast('Non réappliquée(s) : ' + redone.failed.join(', '));
   });
+}
+
+/* ── Colonnes calculées : mémoire par fichier ────────────────────────────
+   Recharger un fichier mis à jour reconstruit `columns` depuis l'Excel : les
+   colonnes calculées disparaîtraient. On garde leurs formules par nom de
+   fichier et on les rejoue après chaque chargement. Rien ne sort du poste :
+   c'est du localStorage, comme le reste des préférences.                   */
+
+function fpCalcMemory(){
+  try{ return JSON.parse(localStorage.getItem('fp_calc_columns')||'{}'); }catch(e){ return {}; }
+}
+function fpCalcMemoryKey(name){ return String(name||'').split(' — ')[0].trim(); }
+
+function fpRememberCalcColumn(colName, formula){
+  if(!formula) return;
+  try{
+    const key = fpCalcMemoryKey(sourceNameFile || '');
+    if(!key) return;
+    const mem = fpCalcMemory();
+    const list = (mem[key] || []).filter(c => c.name !== colName);
+    list.push({ name: colName, formula });
+    mem[key] = list.slice(-12);
+    localStorage.setItem('fp_calc_columns', JSON.stringify(mem));
+  }catch(e){}
+}
+
+function fpForgetCalcColumn(colName){
+  try{
+    const key = fpCalcMemoryKey(sourceNameFile || '');
+    const mem = fpCalcMemory();
+    if(!mem[key]) return;
+    mem[key] = mem[key].filter(c => c.name !== colName);
+    localStorage.setItem('fp_calc_columns', JSON.stringify(mem));
+  }catch(e){}
+}
+
+/** Rejoue les colonnes calculées connues pour ce fichier. Silencieux en cas
+ *  d'échec : une formule qui référence une colonne disparue est ignorée, et
+ *  signalée en bloc plutôt que de bloquer le chargement. */
+function fpReapplyCalcColumns(fileName){
+  const key = fpCalcMemoryKey(fileName);
+  const list = fpCalcMemory()[key] || [];
+  if(!list.length || !rows.length) return { applied: 0, failed: [] };
+
+  const applied = [], failed = [];
+  for(const item of list){
+    if(columns.some(c => c.name === item.name)) continue;   // déjà présente
+    const compiled = window.FP_compileFormula
+      ? window.FP_compileFormula(item.formula, columns.map(c => ({ name:c.name, type:c.type })))
+      : { ok:false };
+    if(!compiled.ok){ failed.push(item.name); continue; }
+    const helpers = { parseDateValue };
+    rows.forEach(r => { r[item.name] = compiled.evaluate(r, helpers); });
+    const col = { name:item.name, type:compiled.type || 'text', _computed:true, _formula:item.formula };
+    try{
+      const model = classifyColumn(col);
+      col.fieldRole = model && model.role;
+      col.businessType = model && model.businessType;
+      fieldModels[item.name] = model;
+    }catch(e){}
+    columns.push(col);
+    applied.push(item.name);
+  }
+  if(applied.length) clearAggregationCache();
+  return { applied: applied.length, failed };
 }
 
 function loadDemo(){
@@ -11608,6 +11702,7 @@ function tblSortBy(col){
    chargées dans le navigateur.                                            */
 
 let _calcColCompiled = null;    // formule compilée en attente de validation
+let _calcColLastFormula = null; // sa source, conservée pour la réappliquer plus tard
 let _calcColSource   = null;    // colonne d'origine, pour la table de contrôle
 let _calcColTab      = 'sugg';
 let _calcSuggestions = [];
@@ -11760,6 +11855,7 @@ function calcColShowPreview(displayFormula){
   const box = calcColEl('calc-col-preview');
   if(!box || !_calcColCompiled) return;
 
+  _calcColLastFormula = displayFormula;
   calcColEl('calc-col-formula').textContent = displayFormula;
 
   const helpers = { parseDateValue };
@@ -12012,7 +12108,16 @@ function calcColApply(){
     r[name] = v;
   });
 
-  columns.push({ name, type: _calcColCompiled.type || 'text', _computed: true });
+  // La formule est conservée sur la colonne : sans elle, recharger un fichier
+  // à jour ferait disparaître les colonnes calculées sans un mot. Elle part
+  // aussi dans le .fpstudio, qui sérialise `columns`.
+  columns.push({
+    name,
+    type: _calcColCompiled.type || 'text',
+    _computed: true,
+    _formula: _calcColLastFormula || null,
+  });
+  fpRememberCalcColumn(name, _calcColLastFormula);
   if(typeof classifyColumn === 'function'){
     // La nouvelle colonne doit être classée comme les autres, sinon elle
     // n'apparaît ni dans les recommandations ni dans les listes de mesures.
@@ -12115,6 +12220,79 @@ async function fpHistoryOpen(idx){
   }
   toast('📂 Accès direct indisponible — re-sélectionne « '+entry.name+' »');
   fpOpenFile();
+}
+
+/* ── Fichiers récents sur l'écran Données ────────────────────────────────
+   L'historique et la réouverture par handle existaient déjà, mais seulement
+   dans le tiroir Réglages. Ils sont désormais là où on en a besoin : au
+   moment du chargement.
+
+   Le handle relit le fichier RÉEL sur le disque : si l'Excel a été mis à jour
+   entre-temps, les données arrivent à jour. C'est tout l'intérêt. Sans handle
+   (Firefox, Safari, ou permission refusée), on ne peut que rouvrir le
+   sélecteur — et l'entrée le dit franchement plutôt que de faire croire à un
+   raccourci qui n'en est pas un.                                          */
+
+function fpRenderRecentFiles(){
+  const block = document.getElementById('fp-recent-block');
+  const list  = document.getElementById('fp-recent-list');
+  if(!block || !list) return;
+
+  const hist = (typeof fpHistory === 'function' ? fpHistory() : []).slice(0, 4);
+  if(!hist.length){ block.style.display = 'none'; return; }
+
+  const ago = ts => {
+    const m = Math.round((Date.now() - ts) / 60000);
+    if(m < 1)  return "a l'instant";
+    if(m < 60) return 'il y a ' + m + ' min';
+    const h = Math.round(m / 60);
+    if(h < 24) return 'il y a ' + h + ' h';
+    return 'il y a ' + Math.round(h / 24) + ' j';
+  };
+
+  list.innerHTML = hist.map((e, i) => {
+    const meta = [
+      e.sheet ? esc(e.sheet) : null,
+      e.rows ? e.rows.toLocaleString('fr-FR') + ' lignes' : null,
+      ago(e.date),
+    ].filter(Boolean).join(' \u00b7 ');
+    const direct = e.hasHandle
+      ? '<span style="font-size:10px;color:var(--muted);white-space:nowrap">relecture directe</span>'
+      : '<span style="font-size:10px;color:var(--muted);white-space:nowrap">a re-selectionner</span>';
+    return '<button type="button" class="fp-recent-item" onclick="fpOpenRecent(' + i + ')"'
+      + ' style="display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--card);'
+      + 'border:1px solid var(--border);border-radius:11px;padding:10px 13px;cursor:pointer;font-family:inherit">'
+      + '<svg class="ui-svg" style="width:18px;height:18px;color:var(--accent);flex-shrink:0"><use href="#i-folder-upload"></use></svg>'
+      + '<span style="flex:1;min-width:0">'
+      + '<span style="display:block;font-size:13px;font-weight:700;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.name) + '</span>'
+      + '<span style="display:block;font-size:11px;color:var(--mid);margin-top:2px">' + meta + '</span>'
+      + '</span>' + direct
+      + '<span role="button" tabindex="0" title="Retirer de la liste" onclick="fpForgetRecent(' + i + ',event)"'
+      + ' style="color:var(--muted);font-size:17px;line-height:1;padding:0 2px;flex-shrink:0">&times;</span>'
+      + '</button>';
+  }).join('');
+  block.style.display = '';
+}
+
+/** Ouvre une entree recente depuis l'ecran Donnees. */
+async function fpOpenRecent(idx){
+  const entry = (typeof fpHistory === 'function' ? fpHistory() : [])[idx];
+  if(!entry) return;
+  // La feuille memorisee evite de la redemander a chaque reouverture.
+  window.__fpPreferSheet = entry.sheet || null;
+  try { await fpHistoryOpen(idx); }
+  catch(e){ window.__fpPreferSheet = null; }
+}
+
+/** Retire une entree : fichier disparu, ou simple menage. */
+function fpForgetRecent(idx, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  try{
+    const h = fpHistory();
+    h.splice(idx, 1);
+    localStorage.setItem('fp_file_history', JSON.stringify(h));
+  }catch(e){}
+  fpRenderRecentFiles();
 }
 
 // ── Profil ────────────────────────────────────────────────────────────────
