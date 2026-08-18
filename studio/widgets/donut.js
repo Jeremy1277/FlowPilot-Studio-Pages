@@ -1,3 +1,8 @@
+/*!
+ * FlowPilot Studio — Copyright (c) 2026 Jeremy Ducrot. Tous droits réservés.
+ * Logiciel propriétaire. Voir LICENSE. Reproduction ou réutilisation du code
+ * interdites sans autorisation écrite.
+ */
 /**
  * FlowPilot Studio — Widget Secteurs (donut.js) v3
  * Légende comme bloc flottant draggable sur le graphique

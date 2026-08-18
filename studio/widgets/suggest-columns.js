@@ -1,3 +1,8 @@
+/*!
+ * FlowPilot Studio — Copyright (c) 2026 Jeremy Ducrot. Tous droits réservés.
+ * Logiciel propriétaire. Voir LICENSE. Reproduction ou réutilisation du code
+ * interdites sans autorisation écrite.
+ */
 /* ===========================================================================
    suggest-columns.js — Propositions de colonnes calculées, sans IA.
 

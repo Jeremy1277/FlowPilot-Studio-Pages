@@ -1,3 +1,8 @@
+/*!
+ * FlowPilot Studio — Copyright (c) 2026 Jeremy Ducrot. Tous droits réservés.
+ * Logiciel propriétaire. Voir LICENSE. Reproduction ou réutilisation du code
+ * interdites sans autorisation écrite.
+ */
 /**
  * FlowPilot Studio — Module Polices (fonts.js)
  * Bibliothèque de 10 polices libres de droit (Google Fonts, licence OFL)
