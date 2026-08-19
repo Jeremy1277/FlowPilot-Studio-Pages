@@ -5,7 +5,7 @@
  */
 /**
  * FlowPilot Studio — Module Internationalisation (i18n.js)
- * Dictionnaire FR/EN, sélecteur de langue, persistance localStorage.
+ * Dictionnaire FR/EN/DE/PL, sélecteur de langue, persistance localStorage.
  * Indépendant de la devise (gérée séparément).
  */
 
@@ -273,7 +273,235 @@ const I18N = {
     toast_pdf_generating: '📄 Generating PDF…',
     toast_image_downloaded: '📥 Image downloaded (clipboard not available on this browser).',
     toast_capturing: '📷 Capturing…',
-  }
+  },
+
+  de: {
+    nav_data: 'Daten',
+    nav_templates: 'Vorlagen',
+    nav_table: 'Tabelle',
+    nav_widgets: 'Widgets',
+    nav_design: 'Design',
+    btn_back: '← Zurück',
+    data_step_label: 'SCHRITT 1',
+    data_title: 'DATEN',
+    data_subtitle: 'FlowPilot analysiert Ihre Spalten, prüft die Datenqualität und schlägt dann passende Vorlagen vor.',
+    data_dropzone_text: 'Excel oder CSV — bis zu 50.000 Zeilen',
+    data_browse_btn: 'Durchsuchen…',
+    data_formats_allowed: 'Zulässige Formate',
+    data_clean_table_note: 'Idealerweise eine saubere Tabelle: eine Kopfzeile, eine Spalte je Information, keine verbundenen Zellen.',
+    data_open_project_btn: '📂 .fpstudio-Projekt öffnen',
+    btn_design_export: 'Design & Export →',
+    panel_visuals_title: 'Visualisierungen',
+    panel_columns_label: 'Spalten',
+    panel_columns_desc: 'Verwalten · Umbenennen',
+    widget_bar_label: 'Säulendiagramm',
+    widget_bar_desc: 'Vergleich nach Kategorie',
+    widget_donut_label: 'Kreisdiagramm',
+    widget_donut_desc: 'Verteilung nach Anteilen',
+    widget_line_label: 'Liniendiagramm',
+    widget_line_desc: 'Entwicklung im Zeitverlauf',
+    widget_kpi_label: 'Kennzahl',
+    widget_kpi_desc: 'Zentrale Kennzahl',
+    widget_table_label: 'Tabelle',
+    widget_table_desc: 'Detaildaten',
+    widget_geo_label: 'Karte',
+    widget_geo_desc: 'Geografische Verteilung',
+    canvas_empty_title: 'Ihre Arbeitsfläche ist leer',
+    canvas_empty_sub: 'Fügen Sie Widgets über die Schaltflächen links hinzu',
+    colpop_title: 'Spalten',
+    colpop_search_placeholder: 'Suchen…',
+    colpop_rename_label: 'Umbenennen',
+    colpop_rename_placeholder: 'Leer lassen = Originalname',
+    colpop_dateformat_label: 'Datumsformat',
+    colpop_no_results: 'Keine Treffer',
+    colpop_auto: 'Automatisch',
+    typepicker_column_label: 'Spalte',
+    typepicker_choose_visual: 'Visualisierung wählen',
+    modal_visual_name: 'Name der Visualisierung',
+    modal_visual_name_placeholder: 'Leer lassen für automatisch',
+    modal_axis_x: 'X-Achse — Dimension',
+    modal_axis_y: 'Y-Achse — Wert',
+    modal_aggregation: 'Aggregation',
+    modal_trend_checkbox: 'Trendlinie hinzufügen',
+    modal_orientation: 'Ausrichtung',
+    modal_orientation_vertical: 'Vertikal',
+    modal_orientation_horizontal: 'Horizontal',
+    modal_orientation_stacked: 'Gestapelt',
+    modal_create_btn: '✓ Visualisierung erstellen',
+    wc_btn_fullscreen: 'Vollbild',
+    wc_btn_values: 'Werte',
+    wc_btn_tuning: '⚙ Feineinstellung',
+    wc_btn_ai: '✨ KI',
+    wc_btn_edit: 'Bearbeiten',
+    wc_btn_delete: 'Löschen',
+    tuning_title: '⚙ Feineinstellung',
+    tuning_shape: 'Form',
+    tuning_colors: 'Farben',
+    tuning_sort_topn: 'Sortierung & Top N',
+    tuning_appearance: 'Darstellung',
+    tuning_objective: 'Zielwert',
+    tuning_axis_sort: 'Achsensortierung',
+    tuning_apply_btn: '✓ Übernehmen',
+    tuning_fill_under_curve: 'Fläche unter der Kurve füllen',
+    tuning_show_values_bars: 'Werte auf den Balken anzeigen',
+    tuning_target_value: 'Zielwert',
+    tuning_max_value: 'Maximalwert',
+    tuning_label: 'Beschriftung',
+    filter_global_label: '📅 GLOBALER FILTER',
+    filter_date_col_placeholder: '— Datumsspalte —',
+    filter_reset: 'Zurücksetzen',
+    filter_period_btn: 'Zeitraum',
+    filter_impacts_all: 'Wirkt auf alle Widgets des Dashboards',
+    filter_lines_filtered: 'Zeilen gefiltert',
+    filter_lines_no_filter: 'Zeilen · kein aktiver Filter',
+    period_day: 'Bestimmter Tag',
+    period_day_desc: 'Ein genaues Datum',
+    period_week: 'Woche',
+    period_week_desc: 'Montag → Sonntag',
+    period_month: 'Monat',
+    period_month_desc: '1. → letzter Tag',
+    period_year: 'Jahr',
+    period_year_desc: '1. Jan. → 31. Dez.',
+    toast_alias_removed: 'Alias entfernt',
+    toast_no_dashboard_capture: 'Kein Dashboard zum Erfassen.',
+    toast_no_dashboard_export: 'Kein Dashboard zum Exportieren.',
+    toast_blank_canvas_opened: 'Leere Arbeitsfläche geöffnet',
+    toast_ai_module_loading: 'Das KI-Modul wird geladen, bitte kurz erneut versuchen',
+    toast_widget_deleted: 'Widget gelöscht',
+    toast_incompatible_column: '⚠ Nicht kompatible Spalte',
+    toast_load_data_first: '⚠ Laden Sie zuerst eine Datendatei',
+    toast_empty_file: '⚠ Leere Datei',
+    toast_select_one_column: '⚠ Wählen Sie mindestens eine Spalte',
+    toast_image_copied: '✅ Bild kopiert! Fügen Sie es direkt in Ihre E-Mail oder Ihren Bericht ein (Strg+V).',
+    toast_pdf_exported: '✅ PDF exportiert!',
+    toast_blank_canvas_manual: '✓ Leere Arbeitsfläche geöffnet — Sie können Ihre Widgets manuell hinzufügen',
+    toast_column_renamed: '✓ Spalte umbenannt',
+    toast_colors_reset: '✓ Farben zurückgesetzt',
+    toast_data_loaded: '✓ Daten geladen — wählen Sie nun Ihre Vorlage',
+    toast_dateformat_updated: '✓ Datumsformat aktualisiert',
+    toast_tuning_applied: '✓ Feineinstellung übernommen',
+    toast_widget_moved: '✓ Widget verschoben',
+    toast_pdf_error: '❌ PDF-Fehler: ',
+    toast_capture_error: '❌ Erfassungsfehler: ',
+    toast_html_export_generated: '⬇ HTML-Export erstellt!',
+    toast_pdf_generating: '📄 PDF wird erstellt…',
+    toast_image_downloaded: '📥 Bild heruntergeladen (Zwischenablage in diesem Browser nicht verfügbar).',
+    toast_capturing: '📷 Wird erfasst…',
+  },
+
+  pl: {
+    nav_data: 'Dane',
+    nav_templates: 'Szablony',
+    nav_table: 'Tabela',
+    nav_widgets: 'Widżety',
+    nav_design: 'Wygląd',
+    btn_back: '← Wstecz',
+    data_step_label: 'KROK 1',
+    data_title: 'DANE',
+    data_subtitle: 'FlowPilot przeanalizuje kolumny, sprawdzi jakość danych, a następnie zaproponuje odpowiednie szablony.',
+    data_dropzone_text: 'Excel lub CSV — do 50 000 wierszy',
+    data_browse_btn: 'Przeglądaj…',
+    data_formats_allowed: 'Dozwolone formaty',
+    data_clean_table_note: 'Najlepiej czysta tabela: jeden wiersz nagłówka, jedna kolumna na informację, bez scalonych komórek.',
+    data_open_project_btn: '📂 Otwórz projekt .fpstudio',
+    btn_design_export: 'Wygląd i eksport →',
+    panel_visuals_title: 'Wizualizacje',
+    panel_columns_label: 'Kolumny',
+    panel_columns_desc: 'Zarządzaj · Zmień nazwę',
+    widget_bar_label: 'Wykres słupkowy',
+    widget_bar_desc: 'Porównanie według kategorii',
+    widget_donut_label: 'Wykres kołowy',
+    widget_donut_desc: 'Podział na udziały',
+    widget_line_label: 'Wykres liniowy',
+    widget_line_desc: 'Zmiana w czasie',
+    widget_kpi_label: 'Wskaźnik',
+    widget_kpi_desc: 'Kluczowy wskaźnik',
+    widget_table_label: 'Tabela',
+    widget_table_desc: 'Dane szczegółowe',
+    widget_geo_label: 'Mapa',
+    widget_geo_desc: 'Podział geograficzny',
+    canvas_empty_title: 'Twój obszar roboczy jest pusty',
+    canvas_empty_sub: 'Użyj przycisków po lewej, aby dodać widżety',
+    colpop_title: 'Kolumny',
+    colpop_search_placeholder: 'Szukaj…',
+    colpop_rename_label: 'Zmień nazwę',
+    colpop_rename_placeholder: 'Puste = nazwa oryginalna',
+    colpop_dateformat_label: 'Format daty',
+    colpop_no_results: 'Brak wyników',
+    colpop_auto: 'Automatycznie',
+    typepicker_column_label: 'Kolumna',
+    typepicker_choose_visual: 'Wybierz wizualizację',
+    modal_visual_name: 'Nazwa wizualizacji',
+    modal_visual_name_placeholder: 'Puste = nazwa automatyczna',
+    modal_axis_x: 'Oś X — wymiar',
+    modal_axis_y: 'Oś Y — wartość',
+    modal_aggregation: 'Agregacja',
+    modal_trend_checkbox: 'Dodaj linię trendu',
+    modal_orientation: 'Orientacja',
+    modal_orientation_vertical: 'Pionowa',
+    modal_orientation_horizontal: 'Pozioma',
+    modal_orientation_stacked: 'Skumulowana',
+    modal_create_btn: '✓ Utwórz wizualizację',
+    wc_btn_fullscreen: 'Pełny ekran',
+    wc_btn_values: 'Wartości',
+    wc_btn_tuning: '⚙ Ustawienia',
+    wc_btn_ai: '✨ SI',
+    wc_btn_edit: 'Edytuj',
+    wc_btn_delete: 'Usuń',
+    tuning_title: '⚙ Ustawienia wizualizacji',
+    tuning_shape: 'Kształt',
+    tuning_colors: 'Kolory',
+    tuning_sort_topn: 'Sortowanie i Top N',
+    tuning_appearance: 'Wygląd',
+    tuning_objective: 'Cel',
+    tuning_axis_sort: 'Sortowanie osi',
+    tuning_apply_btn: '✓ Zastosuj',
+    tuning_fill_under_curve: 'Wypełnij obszar pod krzywą',
+    tuning_show_values_bars: 'Pokaż wartości na słupkach',
+    tuning_target_value: 'Wartość docelowa',
+    tuning_max_value: 'Wartość maksymalna',
+    tuning_label: 'Etykieta',
+    filter_global_label: '📅 FILTR GLOBALNY',
+    filter_date_col_placeholder: '— Kolumna daty —',
+    filter_reset: 'Wyczyść',
+    filter_period_btn: 'Okres',
+    filter_impacts_all: 'Wpływa na wszystkie widżety pulpitu',
+    filter_lines_filtered: 'wierszy po filtrze',
+    filter_lines_no_filter: 'wierszy · brak aktywnego filtra',
+    period_day: 'Konkretny dzień',
+    period_day_desc: 'Dokładna data',
+    period_week: 'Tydzień',
+    period_week_desc: 'Poniedziałek → niedziela',
+    period_month: 'Miesiąc',
+    period_month_desc: '1. → ostatni dzień',
+    period_year: 'Rok',
+    period_year_desc: '1 stycznia → 31 grudnia',
+    toast_alias_removed: 'Alias usunięty',
+    toast_no_dashboard_capture: 'Brak pulpitu do przechwycenia.',
+    toast_no_dashboard_export: 'Brak pulpitu do eksportu.',
+    toast_blank_canvas_opened: 'Otwarto pusty obszar roboczy',
+    toast_ai_module_loading: 'Moduł SI się wczytuje, spróbuj ponownie za chwilę',
+    toast_widget_deleted: 'Widżet usunięty',
+    toast_incompatible_column: '⚠ Niezgodna kolumna',
+    toast_load_data_first: '⚠ Najpierw wczytaj plik z danymi',
+    toast_empty_file: '⚠ Pusty plik',
+    toast_select_one_column: '⚠ Wybierz co najmniej jedną kolumnę',
+    toast_image_copied: '✅ Obraz skopiowany! Wklej go bezpośrednio do wiadomości lub raportu (Ctrl+V).',
+    toast_pdf_exported: '✅ Wyeksportowano PDF!',
+    toast_blank_canvas_manual: '✓ Otwarto pusty obszar roboczy — możesz dodać widżety ręcznie',
+    toast_column_renamed: '✓ Zmieniono nazwę kolumny',
+    toast_colors_reset: '✓ Przywrócono kolory',
+    toast_data_loaded: '✓ Dane wczytane — wybierz teraz szablon',
+    toast_dateformat_updated: '✓ Zaktualizowano format daty',
+    toast_tuning_applied: '✓ Zastosowano ustawienia',
+    toast_widget_moved: '✓ Widżet przeniesiony',
+    toast_pdf_error: '❌ Błąd PDF: ',
+    toast_capture_error: '❌ Błąd przechwytywania: ',
+    toast_html_export_generated: '⬇ Wygenerowano eksport HTML!',
+    toast_pdf_generating: '📄 Generowanie PDF…',
+    toast_image_downloaded: '📥 Obraz pobrany (schowek niedostępny w tej przeglądarce).',
+    toast_capturing: '📷 Przechwytywanie…',
+  },
 };
 
 // ── API ───────────────────────────────────────────────────────────────────
@@ -331,31 +559,45 @@ function injectLangSwitcherCSS() {
 const FLAG_FR = '<svg viewBox="0 0 24 16" width="18" height="13"><rect width="8" height="16" fill="#0055A4"/><rect x="8" width="8" height="16" fill="#fff"/><rect x="16" width="8" height="16" fill="#EF4135"/></svg>';
 const FLAG_GB = '<svg viewBox="0 0 24 16" width="18" height="13"><rect width="24" height="16" fill="#00247d"/><path d="M0 0L24 16M24 0L0 16" stroke="#fff" stroke-width="2.4"/><path d="M0 0L24 16M24 0L0 16" stroke="#cf142b" stroke-width="1.2"/><path d="M12 0V16M0 8H24" stroke="#fff" stroke-width="4"/><path d="M12 0V16M0 8H24" stroke="#cf142b" stroke-width="2.2"/></svg>';
 
+const FLAG_DE = '<svg viewBox="0 0 24 16" width="20" height="14" aria-hidden="true">'
+  + '<rect width="24" height="5.33" y="0" fill="#000"/><rect width="24" height="5.34" y="5.33" fill="#DD0000"/>'
+  + '<rect width="24" height="5.33" y="10.67" fill="#FFCE00"/></svg>';
+const FLAG_PL = '<svg viewBox="0 0 24 16" width="20" height="14" aria-hidden="true">'
+  + '<rect width="24" height="8" y="0" fill="#fff"/><rect width="24" height="8" y="8" fill="#DC143C"/>'
+  + '<rect width="24" height="16" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="1"/></svg>';
+
 function createLangSwitcher() {
   injectLangSwitcherCSS();
   const wrap = document.createElement('div');
   wrap.id = 'fp-lang-switch';
   const current = getLang();
 
-  const frBtn = document.createElement('button');
-  frBtn.innerHTML = FLAG_FR;
-  frBtn.title = 'Français';
-  frBtn.className = current === 'fr' ? 'active' : '';
-  frBtn.onclick = () => { setLang('fr'); };
+  // Table plutôt que des blocs recopiés : ajouter une langue se résume
+  // désormais à une ligne ici et à un bloc dans le dictionnaire.
+  const LANGS = [
+    { code: 'fr', flag: FLAG_FR, title: 'Français' },
+    { code: 'en', flag: FLAG_GB, title: 'English' },
+    { code: 'de', flag: FLAG_DE, title: 'Deutsch' },
+    { code: 'pl', flag: FLAG_PL, title: 'Polski' },
+  ];
 
-  const enBtn = document.createElement('button');
-  enBtn.innerHTML = FLAG_GB;
-  enBtn.title = 'English';
-  enBtn.className = current === 'en' ? 'active' : '';
-  enBtn.onclick = () => { setLang('en'); };
-
-  wrap.appendChild(frBtn);
-  wrap.appendChild(enBtn);
+  LANGS.forEach((l) => {
+    // Une langue listée mais absente du dictionnaire afficherait un drapeau
+    // qui ne traduit rien : on ne la propose pas.
+    if (!I18N[l.code]) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = l.flag;
+    b.title = l.title;
+    b.setAttribute('aria-label', l.title);
+    b.setAttribute('lang', l.code);
+    b.className = current === l.code ? 'active' : '';
+    b.onclick = () => { setLang(l.code); };
+    wrap.appendChild(b);
+  });
   return wrap;
 }
 
-// ── Application automatique aux éléments marqués [data-i18n] ────────────
-// Permet de traduire le HTML statique sans toucher à chaque ligne de JS.
 function applyI18n(root) {
   const scope = root || document;
   scope.querySelectorAll('[data-i18n]').forEach((el) => {
