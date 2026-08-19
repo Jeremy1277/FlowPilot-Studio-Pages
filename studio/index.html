@@ -32,6 +32,22 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
+<meta name="fp-build" content="bc08387 · 19/08/2026 14:22 UTC"/>
+<link rel="canonical" href="https://www.flwpilot.com/studio/"/>
+<script>
+/* Origine canonique. L'apex et le sous-domaine www sont deux origines
+   distinctes pour le navigateur : deux caches, et surtout deux localStorage.
+   Un fichier récent enregistré sur l'un est invisible sur l'autre, et une
+   version en cache sur l'un peut survivre des jours à un déploiement.
+   On ramène tout le monde sur www, celle déclarée dans le CNAME.
+   Exécuté avant tout le reste : la redirection doit coûter le moins possible. */
+(function(){
+  var h = location.hostname;
+  if(h === 'flwpilot.com' || h === 'flwpilot.github.io'){
+    location.replace('https://www.flwpilot.com' + location.pathname + location.search + location.hash);
+  }
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>FlowPilot Studio V5.4 — Valeurs graphiques, agent topbar & performances</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600&family=Barlow+Condensed:wght@400;500;600;700;800;900&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
@@ -12658,6 +12674,8 @@ function fpOpenSettings(instant){
   const lang=(window.FP_getLang&&window.FP_getLang())||'fr';
   const curSkin=(localStorage.getItem('fpTheme')||'light');
 
+  const build=(document.querySelector('meta[name="fp-build"]')||{}).content||'';
+  const buildLabel=(!build||build.indexOf('__FP')===0)?'version locale (non publiée)':build;
   const histo=fpHistory();
   const histoHtml=histo.length?histo.map((h,i)=>{
     const d=new Date(h.date);
@@ -12702,6 +12720,20 @@ function fpOpenSettings(instant){
     +'</div></div>';
 
   document.body.appendChild(ov);
+
+  // Tampon de version, en pied de tiroir. Deux origines (apex et www) peuvent
+  // servir deux déploiements différents, et un cache navigateur en garder un
+  // troisième : sans ce repère, impossible de savoir laquelle on regarde.
+  const panel = document.getElementById('fp-settings-panel');
+  if(panel){
+    const stamp = document.createElement('div');
+    stamp.id = 'fp-build-stamp';
+    stamp.style.cssText = 'padding:12px 18px 16px;font-size:10.5px;color:var(--muted);'
+      + 'border-top:1px solid var(--border);font-family:\'DM Mono\',monospace;line-height:1.6;word-break:break-all';
+    stamp.textContent = 'Version : ' + buildLabel + ' — ' + location.host;
+    panel.appendChild(stamp);
+  }
+
   ov.addEventListener('click',e=>{ if(e.target===ov) fpCloseSettings(); });
   if(instant===true){
     ov.style.transition='none';
@@ -12721,23 +12753,24 @@ function fpOpenSettings(instant){
       if(av) av.textContent=fpInitials(document.getElementById('fp-prof-name').value)||'👤';
     });
   });
-  // vérification automatique de la clé active à l'ouverture du tiroir
-  if(active&&keys[active]) fpSettingsVerify(active);
+  // (la vérification de clé IA a été retirée avec l'IA distante, le 17/08 :
+  //  `active`, `keys` et fpSettingsVerify n'existent plus. La ligne qui les
+  //  appelait levait un ReferenceError à chaque ouverture du tiroir.)
 }
 // Vérifie la clé enregistrée d'un fournisseur (carte du tiroir)
 // Ajout d'une nouvelle clé : vérifiée auprès du fournisseur avant enregistrement
 
 </script>
 <script type="module">
-import { renderBar } from './widgets/bar.js';
-import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=3';
-import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js';
-import { t, getLang, setLang, createLangSwitcher, applyI18n } from './widgets/i18n.js';
-import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js';
-import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js';
-import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js';
-import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js';
-import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js';
+import { renderBar } from './widgets/bar.js?v=bc08387';
+import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=bc08387';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=bc08387';
+import { t, getLang, setLang, createLangSwitcher, applyI18n } from './widgets/i18n.js?v=bc08387';
+import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=bc08387';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=bc08387';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=bc08387';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=bc08387';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=bc08387';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
