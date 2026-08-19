@@ -2043,12 +2043,16 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
 
   // La liste des fichiers récents est peuplée dès le départ : c'est le premier
   // écran, et c'est là qu'elle sert.
-  if(document.readyState !== 'loading') setTimeout(function(){
-    if(typeof fpRenderRecentFiles === 'function') fpRenderRecentFiles();
-  }, 0);
-  else document.addEventListener('DOMContentLoaded', function(){
-    if(typeof fpRenderRecentFiles === 'function') fpRenderRecentFiles();
-  });
+  const showRecents = function(){
+    if(typeof fpRenderRecentFiles !== 'function') return;
+    fpRenderRecentFiles();
+    // Puis, si rien n'a été trouvé, on tente la reconstruction depuis IndexedDB.
+    if(typeof fpRestoreHistory === 'function'){
+      fpRestoreHistory().then(function(restored){ if(restored) fpRenderRecentFiles(); });
+    }
+  };
+  if(document.readyState !== 'loading') setTimeout(showRecents, 0);
+  else document.addEventListener('DOMContentLoaded', showRecents);
 
   var bar    = document.getElementById('fp-bar'),
       pctEl  = document.getElementById('fp-pct'),
@@ -12420,6 +12424,24 @@ async function fpIdbSet(k,v){
     tx.oncomplete=res; tx.onerror=()=>rej(tx.error);
   });
 }
+/** Liste les couples clé/valeur du magasin. Sert à reconstruire l'historique
+ *  quand localStorage a été vidé — ce qui arrive à chaque « effacer les
+ *  données du site », geste banal en développement comme chez l'utilisateur. */
+async function fpIdbAll(){
+  const db=await fpIdb();
+  return new Promise((res)=>{
+    const out=[];
+    const rq=db.transaction('handles').objectStore('handles').openCursor();
+    rq.onsuccess=e=>{
+      const c=e.target.result;
+      if(!c){ res(out); return; }
+      out.push({key:c.key, value:c.value});
+      c.continue();
+    };
+    rq.onerror=()=>res(out);
+  });
+}
+
 async function fpIdbGet(k){
   const db=await fpIdb();
   return new Promise((res,rej)=>{
@@ -12434,6 +12456,10 @@ function fpHistoryAdd(meta, handle){
   h.unshift(meta); h=h.slice(0,8);
   try{ localStorage.setItem('fp_file_history',JSON.stringify(h)); }catch(e){}
   if(handle) fpIdbSet('h:'+meta.name,handle).catch(()=>{});
+  // Doublon volontaire : localStorage est effacé par « supprimer les données
+  // du site », IndexedDB survit à un simple vidage de cache. L'un rattrape
+  // l'autre.
+  fpIdbSet('m:'+meta.name+'|'+(meta.sheet||''), meta).catch(()=>{});
 }
 async function fpHistoryOpen(idx){
   const entry=fpHistory()[idx];
@@ -12487,6 +12513,23 @@ document.addEventListener('click', function(e){
   document.querySelectorAll('.tpl-desc:not([hidden])').forEach(d => { d.hidden = true; });
   document.querySelectorAll('.tpl-info[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded','false'));
 });
+
+/** Reconstruit l'historique depuis IndexedDB quand localStorage est vide.
+ *  Sans ça, un simple « effacer les données du site » fait disparaître la
+ *  liste des fichiers récents alors que les handles, eux, sont toujours là. */
+async function fpRestoreHistory(){
+  try{
+    if(fpHistory().length) return false;
+    const all = await fpIdbAll();
+    const metas = all.filter(e => String(e.key).startsWith('m:') && e.value && e.value.name)
+                     .map(e => e.value)
+                     .sort((a,b) => (b.date||0) - (a.date||0))
+                     .slice(0,8);
+    if(!metas.length) return false;
+    localStorage.setItem('fp_file_history', JSON.stringify(metas));
+    return true;
+  }catch(e){ return false; }
+}
 
 function fpRenderRecentFiles(){
   const block = document.getElementById('fp-recent-block');
