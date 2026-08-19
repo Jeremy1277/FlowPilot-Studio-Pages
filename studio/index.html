@@ -32,7 +32,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="fp-build" content="44a80a3 · 19/08/2026 14:32 UTC"/>
+<meta name="fp-build" content="3b65d26 · 19/08/2026 14:43 UTC"/>
 <link rel="canonical" href="https://www.flwpilot.com/studio/"/>
 <script>
 /* Origine canonique. L'apex et le sous-domaine www sont deux origines
@@ -4598,8 +4598,28 @@ function updateModalVisibility(type){
   if(trendWrap) trendWrap.style.display=(isBar||type==='line')?'':'none';
 
   // Orientation (bar seulement)
+  // Orientation : proposée pour l'histogramme ET la courbe, qui l'honorent
+  // toutes deux. Elle reste masquée pour les autres types — et remise à zéro,
+  // sinon un réglage saisi sur un histogramme fuiterait vers le widget suivant
+  // via un champ resté coché en arrière-plan.
   const orientWrap=document.getElementById('modal-orientation-wrap');
-  if(orientWrap) orientWrap.style.display=isBar?'':'none';
+  const orientable=isBar||type==='line';
+  if(orientWrap){
+    orientWrap.style.display=orientable?'':'none';
+    if(!orientable){
+      const v=document.querySelector('input[name="modal-orient"][value="vertical"]');
+      if(v) v.checked=true;
+    }
+  }
+  // « Empilé » n'a pas de sens sur une courbe : on le retire de son choix.
+  const stackedOpt=document.querySelector('input[name="modal-orient"][value="stacked"]');
+  if(stackedOpt&&stackedOpt.parentElement){
+    stackedOpt.parentElement.style.display=(type==='line')?'none':'';
+    if(type==='line'&&stackedOpt.checked){
+      const v=document.querySelector('input[name="modal-orient"][value="vertical"]');
+      if(v) v.checked=true;
+    }
+  }
 
   // Badge icône dans le header
   const badge=document.getElementById('modal-type-badge');
@@ -5236,13 +5256,18 @@ function renderWidgetBodyRaw(w, containerId, isPreview){
     }
 
     const multi=datasets.length>1;
-    const scales={
-      x:{grid:{display:true,color:FP_THEME.grid},ticks:{font:{size:11},maxRotation:38,autoSkip:true,maxTicksLimit:12}},
-      y:{grid:{display:true,color:FP_THEME.grid},ticks:{font:{size:11},callback:v=>fmtNum(v)}}
-    };
+    // L'orientation était réglable sur la courbe mais silencieusement ignorée :
+    // le réglage existait, ne changeait rien, et l'utilisateur ne pouvait pas
+    // savoir pourquoi. Chart.js sait tracer une courbe sur l'axe des ordonnées.
+    const lineHorizontal = w.barVariant === 'horizontal';
+    const catAxis={grid:{display:true,color:FP_THEME.grid},ticks:{font:{size:11},maxRotation:lineHorizontal?0:38,autoSkip:true,maxTicksLimit:12}};
+    const valAxis={grid:{display:true,color:FP_THEME.grid},ticks:{font:{size:11},callback:v=>fmtNum(v)}};
+    const scales = lineHorizontal
+      ? { y:catAxis, x:valAxis }   // catégories en ordonnée, valeurs en abscisse
+      : { x:catAxis, y:valAxis };
     // Le cumul vit sur une échelle bien plus haute : sans axe dédié il écrase
     // la courbe principale. L'axe est masqué pour ne pas alourdir la lecture.
-    if(ti&&ti.cumul) scales.yCumul={position:'right',display:false,grid:{display:false}};
+    if(ti&&ti.cumul) scales.yCumul={position:lineHorizontal?'top':'right',display:false,grid:{display:false}};
 
     el.innerHTML=`<div class="chart-wrap" style="background:var(--card)"><canvas id="${canvasId}"></canvas></div>`;
     chartInstances[canvasId]=new Chart(document.getElementById(canvasId),{
@@ -5255,6 +5280,7 @@ function renderWidgetBodyRaw(w, containerId, isPreview){
           tooltip:{callbacks:{label:c=>`${c.dataset.label} : ${c.raw==null?'—':fmtNum(c.raw)}`}},
           fpValueLabels:{display:!multi,maxLabels:12}
         },
+        indexAxis: lineHorizontal ? 'y' : 'x',
         layout:{padding:{top:18}}, scales}
     });
     return;
@@ -6489,11 +6515,12 @@ function openTuning(wid){
     section('Couleurs', colorHtml);
   }
 
-  // ── Forme (bar uniquement) ──────────────────────────────────────────
-  if(isBar){
+  // ── Forme (histogramme et courbe : les deux honorent l'orientation) ────
+  if(isBar || w.type === 'line'){
     const formeHtml =
       '<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      + [['vertical','Vertical'],['horizontal','Horizontal'],['stacked','Empilé']].map(([v,l]) =>
+      + (isBar?[['vertical','Vertical'],['horizontal','Horizontal'],['stacked','Empilé']]
+              :[['vertical','Vertical'],['horizontal','Horizontal']]).map(([v,l]) =>
           '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">'
           +'<input type="radio" name="tn-variant" value="'+v+'" '+((w.barVariant||'vertical')===v?'checked':'')+' style="accent-color:var(--accent)"/> '+l
           +'</label>'
@@ -6772,7 +6799,10 @@ function applyTuning(){
   widgets[idx].lineFill = get('tn-linefill')?.checked || false;
   widgets[idx].barColor    = document.querySelector('input[name="tn-colormode"]:checked')?.value || 'mono';
   widgets[idx].color       = get('tn-color')?.value || widgets[idx].color;
-  widgets[idx].barVariant  = document.querySelector('input[name="tn-variant"]:checked')?.value || 'vertical';
+  // Quand le contrôle n'est pas rendu (type sans orientation), on conserve la
+  // valeur existante au lieu de la remettre à « vertical » en douce.
+  widgets[idx].barVariant  = document.querySelector('input[name="tn-variant"]:checked')?.value
+                             || widgets[idx].barVariant || 'vertical';
   widgets[idx].barSort     = document.querySelector('input[name="tn-sort"]:checked')?.value || 'desc';
   widgets[idx].barTopN     = parseInt(get('tn-topn')?.value)||null;
   widgets[idx].barRounded  = parseInt(get('tn-rounded')?.value)||0;
@@ -12762,15 +12792,15 @@ function fpOpenSettings(instant){
 
 </script>
 <script type="module">
-import { renderBar } from './widgets/bar.js?v=44a80a3';
-import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=44a80a3';
-import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=44a80a3';
-import { t, getLang, setLang, createLangSwitcher, applyI18n } from './widgets/i18n.js?v=44a80a3';
-import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=44a80a3';
-import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=44a80a3';
-import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=44a80a3';
-import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=44a80a3';
-import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=44a80a3';
+import { renderBar } from './widgets/bar.js?v=3b65d26';
+import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=3b65d26';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=3b65d26';
+import { t, getLang, setLang, createLangSwitcher, applyI18n } from './widgets/i18n.js?v=3b65d26';
+import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=3b65d26';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=3b65d26';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=3b65d26';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=3b65d26';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=3b65d26';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
