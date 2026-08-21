@@ -32,7 +32,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="fp-build" content="b919149 · 21/08/2026 07:42 UTC"/>
+<meta name="fp-build" content="e3eb8fc · 21/08/2026 07:52 UTC"/>
 <link rel="canonical" href="https://www.flwpilot.com/studio/"/>
 <script>
 /* Origine canonique. L'apex et le sous-domaine www sont deux origines
@@ -68,6 +68,11 @@
 html,body{height:100%;overflow:hidden}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);font-size:14px;line-height:1.5}
 
+
+/* Fond sombre choisi dans Design : les couleurs de texte doivent suivre,
+   sinon on obtient du gris foncé sur du bleu nuit. On réutilise la palette
+   du thème sombre plutôt que d'en inventer une seconde. */
+body.fp-bg-dark{--card:#141d29;--card2:#1a2534;--border:#243244;--dark:#e8eef5;--mid:#a9bccf;--muted:#7d92a8}
 
 /* INTRO SPLASH — écran d'ouverture (refonte Claude Design, 18/08/2026)
    La chorégraphie CSS est celle de la maquette, intacte. Seules trois
@@ -1701,6 +1706,16 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
           <div class="color-presets" id="color-presets"></div>
         </div>
         <div>
+          <label class="dp-label">Fond du tableau de bord</label>
+          <div class="color-presets" id="bg-presets"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+            <input type="color" id="bg-custom" value="#f0f3f7" onchange="setDashBg(this.value)"
+                   aria-label="Fond personnalisé"
+                   style="width:34px;height:28px;padding:0;border:1px solid var(--border);border-radius:7px;background:none;cursor:pointer"/>
+            <button type="button" class="btn" style="font-size:11.5px;padding:5px 10px" onclick="setDashBg('')">Suivre le thème</button>
+          </div>
+        </div>
+        <div>
           <label class="dp-label">Widgets configurés</label>
           <div class="widget-summary" id="widget-summary"></div>
         </div>
@@ -2121,6 +2136,9 @@ body.fp-theme-pantone .btn-primary,body.fp-theme-pantone .step-btn.active{color:
 // ── STATE ────────────────────────────────────────────────────────────────
 let rows=[], columns=[], widgets=[], colAliases={}, colDateFormats={}, colDisplayFormats={}, currentStep=0;
 let fieldModels={}, selectedTemplateId=null;
+// Fond du tableau de bord. Vide = on laisse le thème décider (clair, sombre,
+// sépia) ; renseigné, ce choix prime sur le thème.
+let appBg='';
 let sourceName='', sourceNameFile='', editingId=null, renamingCol=null, dateFormatCol=null, selectedDateFmt=null, dataTypeCol=null, selectedDataType=null, appAccent='#EF9F27';
 
 const DATE_FORMATS=[
@@ -3976,6 +3994,11 @@ function fpMTBCharger(){
         if(Array.isArray(state.widgets)) { widgets.length=0; state.widgets.forEach(w=>widgets.push(w)); }
         if(Array.isArray(state.columns)) { columns.length=0; state.columns.forEach(c=>columns.push(c)); }
         if(state.appName){ const el=document.getElementById('app-name'); if(el) el.value=state.appName; }
+        if(state.accentColor && typeof setAccent==='function'){
+          appAccent=state.accentColor;
+          document.documentElement.style.setProperty('--accent', state.accentColor);
+        }
+        if(typeof setDashBg==='function') setDashBg(state.dashBg||'');
         buildSidebar();
         goStep(3);
         if(typeof renderWidgets==='function') setTimeout(renderWidgets,100);
@@ -5684,6 +5707,7 @@ function buildDesignPanel(){
         <div class="cp-name">${p.label}</div>
       </button>`);
   });
+  buildBgPresets();
   const ws=document.getElementById('widget-summary');
   ws.innerHTML='';
   widgets.forEach(w=>{
@@ -5699,6 +5723,54 @@ function buildDesignPanel(){
       </div>`);
   });
   buildFilterBar();
+}
+
+/* Fonds proposés. Volontairement sobres : un fond de tableau de bord doit
+   reculer, pas concurrencer les données. */
+const BG_PRESETS=[
+  {color:'#f0f3f7', label:'Neutre'},
+  {color:'#ffffff', label:'Blanc'},
+  {color:'#eef2f6', label:'Ardoise'},
+  {color:'#f5f1e8', label:'Sable'},
+  {color:'#0d141e', label:'Nuit'},
+];
+
+function buildBgPresets(){
+  const bp=document.getElementById('bg-presets');
+  if(!bp) return;
+  bp.innerHTML='';
+  BG_PRESETS.forEach(p=>{
+    bp.insertAdjacentHTML('beforeend',
+      '<button class="cp-btn'+(p.color===appBg?' selected':'')+'" onclick="setDashBg(\''+p.color+'\',this)">'
+      +'<div class="cp-dot" style="background:'+p.color+';border:1px solid var(--border)"></div>'
+      +'<div class="cp-name">'+p.label+'</div></button>');
+  });
+  const custom=document.getElementById('bg-custom');
+  if(custom && /^#[0-9a-f]{6}$/i.test(appBg)) custom.value=appBg;
+}
+
+/** Applique le fond. Chaîne vide = on rend la main au thème. */
+function setDashBg(color, btn){
+  appBg = color || '';
+  if(appBg) document.documentElement.style.setProperty('--bg', appBg);
+  else document.documentElement.style.removeProperty('--bg');
+  // Un fond sombre avec un texte sombre serait illisible : on bascule la
+  // famille de couleurs de texte quand la luminance descend.
+  document.body.classList.toggle('fp-bg-dark', !!appBg && fpIsDarkColor(appBg));
+  document.querySelectorAll('#bg-presets .cp-btn').forEach(b=>b.classList.remove('selected'));
+  if(btn) btn.classList.add('selected');
+  else buildBgPresets();
+  if(typeof refreshPreview==='function') refreshPreview();
+}
+
+/** Luminance perçue : les coefficients pondèrent le vert, auquel l'œil est
+ *  le plus sensible. Sous 0,5 on considère le fond sombre. */
+function fpIsDarkColor(hex){
+  const m=/^#?([0-9a-f]{6})$/i.exec(String(hex||''));
+  if(!m) return false;
+  const n=parseInt(m[1],16);
+  const r=(n>>16&255)/255, g=(n>>8&255)/255, b=(n&255)/255;
+  return (0.2126*r + 0.7152*g + 0.0722*b) < 0.5;
 }
 
 function setAccent(color,btn){
@@ -7236,7 +7308,7 @@ function exportHTML(){
 function exportHTMLInner(){
   const name=document.getElementById('app-name')?.value||'Mon Analyse';
   const safeRows=rows;
-  const html=buildExportHTML(name,safeRows,widgets,columns,colAliases,colDateFormats,appAccent,COLORS,AGGR_TYPES,CHART_TYPES);
+  const html=buildExportHTML(name,safeRows,widgets,columns,colAliases,colDateFormats,appAccent,COLORS,AGGR_TYPES,CHART_TYPES,appBg);
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
@@ -7278,7 +7350,7 @@ function fpWidgetsForExport(){
   });
 }
 
-function buildExportHTML(name,safeRows,widgets,columns,colAliases,colDateFormats,accent,COLORS,AGGR_TYPES,CHART_TYPES){
+function buildExportHTML(name,safeRows,widgets,columns,colAliases,colDateFormats,accent,COLORS,AGGR_TYPES,CHART_TYPES,dashBg){
 return `<!DOCTYPE html>
 <html lang="fr"><head>
 <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
@@ -7288,7 +7360,7 @@ return `<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-geo@4/build/index.umd.min.js"><\/script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--accent:${accent};--navy:#0d1b2a;--bg:#f0f3f7;--card:#fff;--card2:#f8fafc;--accent-soft:rgba(239,159,39,0.13);--border:#e2e8f0;--dark:#1a2733;--mid:#607287;--muted:#8ca0b3}
+:root{--accent:${accent};--navy:#0d1b2a;--bg:${dashBg||'#f0f3f7'};--card:${dashBg&&fpIsDarkColor(dashBg)?'#141d29':'#fff'};--card2:${dashBg&&fpIsDarkColor(dashBg)?'#1a2534':'#f8fafc'};--accent-soft:rgba(239,159,39,0.13);--border:${dashBg&&fpIsDarkColor(dashBg)?'#243244':'#e2e8f0'};--dark:${dashBg&&fpIsDarkColor(dashBg)?'#e8eef5':'#1a2733'};--mid:${dashBg&&fpIsDarkColor(dashBg)?'#a9bccf':'#607287'};--muted:${dashBg&&fpIsDarkColor(dashBg)?'#7d92a8':'#8ca0b3'}}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);min-height:100vh}
 .topbar{background:var(--navy);height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:10}
 .brand{font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:800;color:#fff;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
@@ -11592,7 +11664,10 @@ function collectState() {
     _app: 'FlowPilot Studio',
     _saved: new Date().toISOString(),
     appName:     document.getElementById('app-name')?.value || '',
-    accentColor: document.getElementById('dp-color')?.value || '',
+    // Lisait un élément « dp-color » qui n'a jamais existé : la couleur
+    // principale n'était donc jamais enregistrée dans les projets.
+    accentColor: (typeof appAccent !== 'undefined') ? appAccent : '',
+    dashBg:      (typeof appBg !== 'undefined') ? appBg : '',
     widgets:     (typeof widgets !== 'undefined') ? JSON.parse(JSON.stringify(widgets)) : [],
     columns:     (typeof columns !== 'undefined') ? JSON.parse(JSON.stringify(columns)) : [],
     colAliases:  (typeof colAliases !== 'undefined') ? colAliases : {},
@@ -12877,15 +12952,15 @@ function fpOpenSettings(instant){
 
 </script>
 <script type="module">
-import { renderBar } from './widgets/bar.js?v=b919149';
-import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=b919149';
-import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=b919149';
-import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=b919149';
-import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=b919149';
-import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=b919149';
-import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=b919149';
-import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=b919149';
-import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=b919149';
+import { renderBar } from './widgets/bar.js?v=e3eb8fc';
+import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=e3eb8fc';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=e3eb8fc';
+import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=e3eb8fc';
+import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=e3eb8fc';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=e3eb8fc';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=e3eb8fc';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=e3eb8fc';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=e3eb8fc';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
