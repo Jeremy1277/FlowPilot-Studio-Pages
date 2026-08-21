@@ -32,7 +32,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="fp-build" content="e3eb8fc · 21/08/2026 07:52 UTC"/>
+<meta name="fp-build" content="57becc7 · 21/08/2026 08:38 UTC"/>
 <link rel="canonical" href="https://www.flwpilot.com/studio/"/>
 <script>
 /* Origine canonique. L'apex et le sous-domaine www sont deux origines
@@ -73,6 +73,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--dark);fon
    sinon on obtient du gris foncé sur du bleu nuit. On réutilise la palette
    du thème sombre plutôt que d'en inventer une seconde. */
 body.fp-bg-dark{--card:#141d29;--card2:#1a2534;--border:#243244;--dark:#e8eef5;--mid:#a9bccf;--muted:#7d92a8}
+
+/* Repère de dépôt : montre où la carte atterrira avant de lâcher. */
+.fp-drop-guide{border:2px dashed var(--accent);border-radius:12px;background:var(--accent-soft);
+  pointer-events:none;opacity:.85}
 
 /* INTRO SPLASH — écran d'ouverture (refonte Claude Design, 18/08/2026)
    La chorégraphie CSS est celle de la maquette, intacte. Seules trois
@@ -2194,6 +2198,36 @@ function formatDateDisplay(value, displayFmt){
 /* Types dont la hauteur suit le contenu au lieu de remplir l'espace :
    un KPI ou une jauge n'ont rien à étirer. */
 const FP_CONTENT_SIZED=['kpi','gauge'];
+
+/* ── Placement libre dans la grille ──────────────────────────────────────
+   Historiquement les cartes étaient posées en flux : elles se réorganisaient
+   les unes derrière les autres et on ne pouvait ni laisser de trou, ni placer
+   un widget à un endroit précis.
+
+   Chaque widget peut désormais porter `gridCol` (1..12) et `gridRow` (1..N).
+   Renseignés, ils fixent la position ; absents, le widget reprend le flux
+   automatique. Les deux modes coexistent : un tableau de bord existant garde
+   exactement sa disposition tant qu'on ne déplace rien.                     */
+const FP_GRID_COLS = 12;
+const FP_ROW_PX = 40;   // hauteur d'une ligne de grille implicite
+
+/** Style CSS de placement, commun à l'application, à l'aperçu et à l'export. */
+function fpPlacementStyle(w, span){
+  const col = parseInt(w.gridCol, 10);
+  const row = parseInt(w.gridRow, 10);
+  let css = '--widget-span:' + span + ';';
+  if(Number.isFinite(col) && col >= 1 && col <= FP_GRID_COLS){
+    // On borne pour qu'un widget large placé à droite ne déborde pas de la grille.
+    const start = Math.min(col, FP_GRID_COLS - span + 1);
+    css += 'grid-column:' + start + ' / span ' + span + ';';
+  }
+  if(Number.isFinite(row) && row >= 1){
+    const rowSpan = Math.max(1, Math.round((parseInt(w.height,10) || 260) / FP_ROW_PX));
+    css += 'grid-row:' + row + ' / span ' + rowSpan + ';';
+  }
+  return css;
+}
+
 
 const CHART_TYPES=[
   {id:'bar',   icon:'▬', label:'Histogramme colonne'},
@@ -4879,7 +4913,7 @@ function renderWidgets(){
     const h=w.height||'auto';
     const span=finalSpan(w,widgetIdx);
     grid.insertAdjacentHTML('beforeend',`
-      <div class="widget-card" id="wc-${w.id}" data-wtype="${w.type}" title="${esc(titleText)}" style="--widget-span:${span};${h!=='auto'?'height:'+h+'px;grid-row:span 1':''}">
+      <div class="widget-card" id="wc-${w.id}" data-wtype="${w.type}" title="${esc(titleText)}" style="${fpPlacementStyle(w,span)}${h!=='auto'?'height:'+h+'px;':''}">
         <div class="widget-card-inner">
           <div class="wc-header">
             <div style="min-width:0">
@@ -5802,7 +5836,7 @@ function refreshPreview(){
     const subText=getWidgetSub(w);
     const span=Math.max(3,Math.min(12,w.widthCols||4));
     pg.insertAdjacentHTML('beforeend',`
-      <div class="widget-card" data-wtype="${w.type}" style="--widget-span:${span};${w.height?'height:'+w.height+'px':''}">
+      <div class="widget-card" data-wtype="${w.type}" style="${fpPlacementStyle(w,span)}${w.height?'height:'+w.height+'px':''}">
         <div class="widget-card-inner">
           <div class="wc-header">
             <div style="min-width:0">
@@ -7480,6 +7514,15 @@ ${String(FP_MONTHS_SHORT_SRC)}
 ${String(fpPeriodKey)}
 ${String(fpPeriodLabel)}
 function groupByTime(dc,vc,ag,lim){const fmtId=colDateFormats[dc]||'month';return cachedAggregation(['time',dc,vc||'',ag||'',lim||12,fmtId].join('§'),()=>{const m={};rows.forEach(r=>{const raw=r[dc];if(!raw)return;const d=parseDateValue(raw);if(!d)return;const k=fpPeriodKey(d,fmtId);if(!k)return;if(!m[k])m[k]=[];m[k].push(vc?r[vc]:1)});return Object.entries(m).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v])=>[fpPeriodLabel(k,fmtId),aggregate(v,vc?ag:'count')]).slice(0,lim||12)})}
+/* Placement des cartes : même règle que dans l'application, pour que le
+   dashboard exporté reproduise exactement la disposition choisie. */
+function fpPlaceCSS(w,span){
+  var css='--widget-span:'+span+';';
+  var col=parseInt(w.gridCol,10), row=parseInt(w.gridRow,10);
+  if(isFinite(col)&&col>=1&&col<=12){ css+='grid-column:'+Math.min(col,13-span)+' / span '+span+';'; }
+  if(isFinite(row)&&row>=1){ css+='grid-row:'+row+' / span '+Math.max(1,Math.round((parseInt(w.height,10)||260)/40))+';'; }
+  return css;
+}
 function computeKPI(col,ag){return cachedAggregation(['kpi',col,ag||'sum'].join('§'),()=>aggregate(rows.map(r=>r[col]),ag||'sum'))}
 const ISO2_TO_NUM = {
   AD:"20",AE:"784",AF:"4",AG:"28",AI:"660",AL:"8",AM:"51",AO:"24",AQ:"10",AR:"32",
@@ -9246,9 +9289,10 @@ widgets.forEach((w,wi)=>{
   else sub=w.col?(w.col2?colLabel(w.col)+' → '+colLabel(w.col2):colLabel(w.col)):'';
   const bid='wb'+wi;
   const span=Math.max(3,Math.min(12,w.widthCols||4));
+  const place=fpPlaceCSS(w,span);
   const hStyle=w.height?'height:'+w.height+'px;':'';
   const bStyle=w.height?'height:calc('+w.height+'px - 52px);overflow:auto;':'';
-  grid.insertAdjacentHTML('beforeend',\`<div class="wc" style="--widget-span:\${span};\${hStyle}"><div class="wh"><div class="wt">\${esc(title)}</div>\${sub?'<div class="ws">'+esc(sub)+'</div>':''}</div><div class="wb" id="\${bid}" style="\${bStyle}"></div></div>\`);
+  grid.insertAdjacentHTML('beforeend',\`<div class="wc" style="\${place}\${hStyle}"><div class="wh"><div class="wt">\${esc(title)}</div>\${sub?'<div class="ws">'+esc(sub)+'</div>':''}</div><div class="wb" id="\${bid}" style="\${bStyle}"></div></div>\`);
   const el=document.getElementById(bid);
   const color=w.color||accent;
   if(w.type==='kpi'){var val=w.kpiCol?computeKPI(w.kpiCol,w.aggrKpi||'sum'):0;var ag=AGGR_TYPES.find(function(a){return a.id===(w.aggrKpi||'sum')});var kc=w._kpiCmp,kh='';if(kc&&kc.pct!==null&&kc.pct!==undefined){var up=kc.direction==='up',flat=kc.direction==='flat';var arr=flat?'\u2192':(up?'\u2191':'\u2193');var kcol=flat?'#898781':(up?'#006300':'#d03b3b');var kp=(Math.abs(kc.pct)<0.05?'0':(kc.pct>0?'+':'\u2212')+Math.abs(kc.pct).toLocaleString('fr-FR',{maximumFractionDigits:1}));kh='<div class="kpi-sub" style="color:'+kcol+';font-weight:800">'+arr+' '+kp+' % '+'<span style="color:#898781;font-weight:500">'+esc(kc.label)+' ('+(kc.previous==null?'\u2014':fmt(kc.previous))+')</span>'+(kc.partial?'<span title="P\u00e9riode en cours, non termin\u00e9e." style="color:#898781"> \u26a0</span>':'')+'</div>';}el.innerHTML='<div class="kpi-val">'+fmt(val)+'</div><div class="kpi-sub">'+(ag?ag.label:'')+' \u2014 '+esc(colLabel(w.kpiCol||''))+'</div>'+kh;return}
@@ -10083,10 +10127,79 @@ widgets.forEach((w,wi)=>{
     toast(window.FP_t?window.FP_t('toast_widget_moved'):'✓ Widget déplacé');
   }
 
+  /* Dépôt libre : lâcher une carte sur une zone vide de la grille la place à
+     cet endroit précis, au lieu de la réinsérer dans le flux. Le dépôt sur une
+     autre carte conserve l'ancien comportement de réordonnancement, plus
+     naturel quand on veut juste permuter deux visuels. */
+  function fpCellFromPoint(grid, clientX, clientY){
+    const r=grid.getBoundingClientRect();
+    const colW=r.width/FP_GRID_COLS;
+    const col=Math.max(1, Math.min(FP_GRID_COLS, Math.floor((clientX-r.left)/colW)+1));
+    const row=Math.max(1, Math.floor((clientY-r.top+grid.scrollTop)/FP_ROW_PX)+1);
+    return {col,row};
+  }
+
+  function fpPlaceWidgetAt(id, col, row){
+    const idx=widgets.findIndex(w=>w.id===id);
+    if(idx<0) return;
+    widgets[idx].gridCol=col;
+    widgets[idx].gridRow=row;
+    renderWidgets();
+    if(currentStep===4) refreshPreview();
+    toast('Widget positionné');
+  }
+
+  /** Rend un widget au placement automatique. */
+  function fpResetPlacement(id){
+    const idx=widgets.findIndex(w=>w.id===id);
+    if(idx<0) return;
+    delete widgets[idx].gridCol;
+    delete widgets[idx].gridRow;
+    renderWidgets();
+    toast('Placement automatique rétabli');
+  }
+  window.fpResetPlacement=fpResetPlacement;
+
+  function enhanceGridDrop(grid){
+    if(grid.__fpGridDrop) return;
+    grid.__fpGridDrop=true;
+    let guide=null;
+    const showGuide=(col,row)=>{
+      if(!guide){
+        guide=document.createElement('div');
+        guide.className='fp-drop-guide';
+        grid.appendChild(guide);
+      }
+      guide.style.gridColumn=col+' / span 3';
+      guide.style.gridRow=row+' / span 5';
+    };
+    const hideGuide=()=>{ if(guide){ guide.remove(); guide=null; } };
+
+    grid.addEventListener('dragover',e=>{
+      if(!draggedWidgetId) return;
+      // Survol d'une carte : c'est elle qui décide, on ne s'en mêle pas.
+      if(e.target.closest && e.target.closest('.widget-card')) { hideGuide(); return; }
+      e.preventDefault();
+      const {col,row}=fpCellFromPoint(grid, e.clientX, e.clientY);
+      showGuide(col,row);
+    });
+    grid.addEventListener('dragleave',e=>{ if(e.target===grid) hideGuide(); });
+    grid.addEventListener('drop',e=>{
+      if(!draggedWidgetId) return;
+      if(e.target.closest && e.target.closest('.widget-card')) return;
+      e.preventDefault();
+      const {col,row}=fpCellFromPoint(grid, e.clientX, e.clientY);
+      hideGuide();
+      fpPlaceWidgetAt(draggedWidgetId, col, row);
+    });
+    grid.addEventListener('dragend',hideGuide);
+  }
+
   function enhanceWidgetDragging(){
     injectV50Style();
     const grid=document.getElementById('widget-grid');
     if(!grid) return;
+    enhanceGridDrop(grid);
     const cards=[...grid.querySelectorAll('.widget-card[id^="wc-"]')];
     cards.forEach(card=>{
       if(card.__fpDragEnhanced) return;
@@ -12952,15 +13065,15 @@ function fpOpenSettings(instant){
 
 </script>
 <script type="module">
-import { renderBar } from './widgets/bar.js?v=e3eb8fc';
-import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=e3eb8fc';
-import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=e3eb8fc';
-import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=e3eb8fc';
-import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=e3eb8fc';
-import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=e3eb8fc';
-import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=e3eb8fc';
-import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=e3eb8fc';
-import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=e3eb8fc';
+import { renderBar } from './widgets/bar.js?v=57becc7';
+import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=57becc7';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=57becc7';
+import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=57becc7';
+import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=57becc7';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=57becc7';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=57becc7';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=57becc7';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=57becc7';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
