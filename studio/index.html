@@ -32,7 +32,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="fp-build" content="bfa89e6 · 21/08/2026 10:40 UTC"/>
+<meta name="fp-build" content="3c1a0aa · 21/08/2026 11:51 UTC"/>
 <link rel="canonical" href="https://www.flwpilot.com/studio/"/>
 <script>
 /* Origine canonique. L'apex et le sous-domaine www sont deux origines
@@ -77,6 +77,11 @@ body.fp-bg-dark{--card:#141d29;--card2:#1a2534;--border:#243244;--dark:#e8eef5;-
 /* Repère de dépôt : montre où la carte atterrira avant de lâcher. */
 .fp-drop-guide{border:2px dashed var(--accent);border-radius:12px;background:var(--accent-soft);
   pointer-events:none;opacity:.85}
+
+.th-filter{display:inline-block;margin-left:6px;padding:0 4px;border-radius:5px;color:var(--muted);
+  cursor:pointer;font-size:11px;line-height:1.4;transition:color .12s,background .12s}
+.th-filter:hover{color:var(--accent);background:var(--accent-soft)}
+.th-filter.on{color:#fff;background:var(--accent)}
 
 /* INTRO SPLASH — écran d'ouverture (refonte Claude Design, 18/08/2026)
    La chorégraphie CSS est celle de la maquette, intacte. Seules trois
@@ -12103,11 +12108,213 @@ function initTableStep(){
   renderTable();
 }
 
+/* ── Filtres par colonne ─────────────────────────────────────────────────
+   La recherche globale ne suffisait pas : elle compare aux valeurs BRUTES.
+   Une date stockée « 2025-01-03 » s'affiche « 03/01/2025 » — taper ce qu'on
+   voit à l'écran ne trouvait rien, ce qui donne l'impression que la donnée est
+   absente. Chaque colonne a désormais son propre filtre, adapté à son type,
+   et la recherche globale compare aussi au texte affiché.              */
+
+let _tblFilters = {};        // { colonne: {kind, ...} }
+
+function tblFilterActive(col){ return !!_tblFilters[col]; }
+function tblFilterCount(){ return Object.keys(_tblFilters).length; }
+
+/** Texte tel qu'il apparaît dans la table — c'est sur lui que l'utilisateur
+ *  raisonne, donc c'est sur lui qu'on doit pouvoir filtrer. */
+function tblDisplayValue(c, v){
+  if(v===null||v===undefined||v==='') return '';
+  if(c.type==='number'){
+    const n=parseFloat(v);
+    return Number.isFinite(n) ? n.toLocaleString('fr-FR',{maximumFractionDigits:2}) : String(v);
+  }
+  if(c.type==='date') return formatDateDisplay(v,'date_short');
+  return String(v);
+}
+
+function tblPasses(r){
+  for(const col in _tblFilters){
+    const f=_tblFilters[col];
+    const raw=r[col];
+    if(f.kind==='values'){
+      if(!f.set.has(String(raw??''))) return false;
+    } else if(f.kind==='range'){
+      const n=parseFloat(raw);
+      if(!Number.isFinite(n)) return false;
+      if(f.min!=='' && f.min!=null && n<parseFloat(f.min)) return false;
+      if(f.max!=='' && f.max!=null && n>parseFloat(f.max)) return false;
+    } else if(f.kind==='dates'){
+      const d=parseDateValue(raw);
+      if(!d) return false;
+      if(f.from && d < new Date(f.from+'T00:00:00')) return false;
+      if(f.to   && d > new Date(f.to+'T23:59:59')) return false;
+    } else if(f.kind==='contains'){
+      if(!String(raw??'').toLowerCase().includes(f.text)) return false;
+    } else if(f.kind==='nonempty'){
+      if(raw===null||raw===undefined||raw==='') return false;
+    }
+  }
+  return true;
+}
+
+/** Valeurs distinctes d'une colonne, avec leur effectif.
+ *  Sur 180 000 lignes on borne : au-delà de 500 valeurs, une liste à cocher
+ *  n'aide plus personne et le filtre « contient » prend le relais. */
+function tblDistinct(col, max){
+  const c=columns.find(x=>x.name===col)||{};
+  const m=new Map();
+  for(let i=0;i<rows.length;i++){
+    const raw=rows[i][col];
+    const key=String(raw??'');
+    const e=m.get(key);
+    if(e) e.n++;
+    else {
+      if(m.size>=(max||500)) return {values:[...m.values()], truncated:true};
+      m.set(key,{key, label:tblDisplayValue(c,raw)||'(vide)', n:1});
+    }
+  }
+  return {values:[...m.values()].sort((a,b)=>b.n-a.n), truncated:false};
+}
+
+/** Change le type d'une colonne, comme dans Power Query. Les valeurs sont
+ *  converties dans les données pour que tout l'aval — agrégats, widgets,
+ *  formules — travaille sur le bon type, pas seulement l'affichage. */
+function tblSetColumnType(col, type){
+  const c=columns.find(x=>x.name===col);
+  if(!c || c.type===type) { tblCloseMenu(); return; }
+  let failed=0;
+  for(let i=0;i<rows.length;i++){
+    const v=rows[i][col];
+    if(v===null||v===undefined||v==='') continue;
+    if(type==='number'){
+      const n=parseFloat(String(v).replace(/\s/g,'').replace(',','.'));
+      if(Number.isFinite(n)) rows[i][col]=n; else { failed++; }
+    } else if(type==='date'){
+      const d=parseDateValue(v);
+      if(d) rows[i][col]=d.toISOString().slice(0,10); else { failed++; }
+    } else {
+      rows[i][col]=String(v);
+    }
+  }
+  c.type=type;
+  delete _tblFilters[col];          // un filtre posé sur l'ancien type n'a plus de sens
+  try{ buildFieldModel(); }catch(e){}
+  clearAggregationCache();
+  tblCloseMenu();
+  _tblPage=0;
+  renderTable();
+  toast(failed
+    ? 'Type changé — '+failed.toLocaleString('fr-FR')+' valeur(s) non convertible(s), laissées telles quelles'
+    : 'Type changé : '+col+' → '+(type==='number'?'nombre':type==='date'?'date':'texte'));
+}
+
+function tblCloseMenu(){
+  document.getElementById('tbl-colmenu')?.remove();
+  document.removeEventListener('click', tblMenuOutside, true);
+}
+function tblMenuOutside(e){
+  const m=document.getElementById('tbl-colmenu');
+  if(m && !m.contains(e.target) && !e.target.closest('.th-filter')) tblCloseMenu();
+}
+
+function tblClearFilter(col){
+  delete _tblFilters[col];
+  tblCloseMenu(); _tblPage=0; renderTable();
+}
+
+function tblApplyFilter(col){
+  const c=columns.find(x=>x.name===col)||{};
+  const g=id=>document.getElementById(id);
+  if(c.type==='number'){
+    const min=g('tf-min').value.trim(), max=g('tf-max').value.trim();
+    if(min===''&&max==='') delete _tblFilters[col];
+    else _tblFilters[col]={kind:'range',min,max};
+  } else if(c.type==='date'){
+    const from=g('tf-from').value, to=g('tf-to').value;
+    if(!from&&!to) delete _tblFilters[col];
+    else _tblFilters[col]={kind:'dates',from,to};
+  } else {
+    const txt=(g('tf-contains')?.value||'').toLowerCase().trim();
+    const checked=[...document.querySelectorAll('#tbl-colmenu input[data-val]')]
+      .filter(i=>i.checked).map(i=>i.dataset.val);
+    const all=document.querySelectorAll('#tbl-colmenu input[data-val]').length;
+    if(txt) _tblFilters[col]={kind:'contains',text:txt};
+    else if(checked.length && checked.length<all) _tblFilters[col]={kind:'values',set:new Set(checked)};
+    else delete _tblFilters[col];
+  }
+  tblCloseMenu(); _tblPage=0; renderTable();
+}
+
+function tblOpenColMenu(col, anchorEl){
+  tblCloseMenu();
+  const c=columns.find(x=>x.name===col)||{type:'text'};
+  const f=_tblFilters[col];
+  const r=anchorEl.getBoundingClientRect();
+
+  let inner='';
+  if(c.type==='number'){
+    inner='<div style="display:flex;gap:8px">'
+      +'<label style="flex:1;font-size:11px;color:var(--muted)">Minimum<input id="tf-min" type="number" value="'+esc(f&&f.kind==="range"?f.min:"")+'" style="width:100%;margin-top:3px;border:1px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12px"/></label>'
+      +'<label style="flex:1;font-size:11px;color:var(--muted)">Maximum<input id="tf-max" type="number" value="'+esc(f&&f.kind==="range"?f.max:"")+'" style="width:100%;margin-top:3px;border:1px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12px"/></label>'
+      +'</div>';
+  } else if(c.type==='date'){
+    inner='<div style="display:flex;gap:8px">'
+      +'<label style="flex:1;font-size:11px;color:var(--muted)">À partir du<input id="tf-from" type="date" value="'+esc(f&&f.kind==="dates"?(f.from||""):"")+'" style="width:100%;margin-top:3px;border:1px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12px"/></label>'
+      +'<label style="flex:1;font-size:11px;color:var(--muted)">Jusqu\'au<input id="tf-to" type="date" value="'+esc(f&&f.kind==="dates"?(f.to||""):"")+'" style="width:100%;margin-top:3px;border:1px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12px"/></label>'
+      +'</div>';
+  } else {
+    const d=tblDistinct(col,300);
+    const sel=f&&f.kind==='values'?f.set:null;
+    inner='<input id="tf-contains" type="text" placeholder="Contient…" value="'+esc(f&&f.kind==="contains"?f.text:"")+'" style="width:100%;border:1px solid var(--border);border-radius:7px;padding:6px 8px;font-size:12px;box-sizing:border-box"/>'
+      +(d.truncated
+        ? '<div style="font-size:10.5px;color:var(--muted);margin-top:8px">Plus de 300 valeurs distinctes : utilise « contient ».</div>'
+        : '<div style="max-height:200px;overflow:auto;margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:6px">'
+          + d.values.map(v=>'<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer">'
+              +'<input type="checkbox" data-val="'+esc(v.key)+'" '+(!sel||sel.has(v.key)?'checked':'')+'/>'
+              +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(v.label)+'</span>'
+              +'<span style="color:var(--muted);font-size:10.5px">'+v.n.toLocaleString('fr-FR')+'</span></label>').join('')
+          + '</div>');
+  }
+
+  const typeBtn=(t,l)=>'<button type="button" onclick="tblSetColumnType(\''+esc(col).replace(/'/g,"\\'")+'\',\''+t+'\')" '
+    +'style="flex:1;border:1px solid '+(c.type===t?'var(--accent)':'var(--border)')+';background:'+(c.type===t?'var(--accent-soft)':'var(--card)')+';'
+    +'color:'+(c.type===t?'var(--accent)':'var(--mid)')+';border-radius:7px;padding:5px 6px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">'+l+'</button>';
+
+  const m=document.createElement('div');
+  m.id='tbl-colmenu';
+  m.style.cssText='position:fixed;z-index:900;width:280px;background:var(--card);border:1px solid var(--border);'
+    +'border-radius:12px;box-shadow:0 18px 44px rgba(13,27,42,.22);padding:12px;font-family:\'DM Sans\',sans-serif';
+  m.innerHTML='<div style="font-size:12px;font-weight:800;color:var(--dark);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(col)+'</div>'
+    +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:10px 0 5px">Type de valeur</div>'
+    +'<div style="display:flex;gap:5px">'+typeBtn('text','Texte')+typeBtn('number','Nombre')+typeBtn('date','Date')+'</div>'
+    +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:12px 0 5px">Filtrer</div>'
+    +inner
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button type="button" class="btn" style="flex:1;justify-content:center;font-size:12px" onclick="tblClearFilter(\''+esc(col).replace(/'/g,"\\'")+'\')">Effacer</button>'
+    +'<button type="button" class="btn btn-primary" style="flex:1;justify-content:center;font-size:12px" onclick="tblApplyFilter(\''+esc(col).replace(/'/g,"\\'")+'\')">Appliquer</button>'
+    +'</div>';
+  document.body.appendChild(m);
+  // Repositionné après insertion : la hauteur n'est connue qu'une fois rendu.
+  const mw=m.offsetWidth, mh=m.offsetHeight;
+  m.style.left=Math.max(8, Math.min(window.innerWidth-mw-8, r.left))+'px';
+  m.style.top=Math.max(8, Math.min(window.innerHeight-mh-8, r.bottom+6))+'px';
+  setTimeout(()=>document.addEventListener('click', tblMenuOutside, true),0);
+}
+
 function tblGetRows(){
   const q = (document.getElementById('tbl-search')?.value||'').toLowerCase().trim();
-  let data = rows;
+  // Les filtres de colonne s'appliquent avant la recherche : ils sont plus
+  // sélectifs, et cela évite de formater des lignes qu'on va écarter.
+  let data = tblFilterCount() ? rows.filter(tblPasses) : rows;
   if(q){
-    data = rows.filter(r => Object.values(r).some(v => String(v??'').toLowerCase().includes(q)));
+    // On compare à la valeur brute ET à la valeur affichée : une date stockée
+    // « 2025-01-03 » se cherche aussi bien par « 03/01/2025 », qui est ce que
+    // l'utilisateur a sous les yeux.
+    data = data.filter(r => columns.some(c => {
+      const v = r[c.name];
+      if(String(v??'').toLowerCase().includes(q)) return true;
+      return tblDisplayValue(c, v).toLowerCase().includes(q);
+    }));
   }
   if(_tblSort.col){
     const col = _tblSort.col, dir = _tblSort.dir;
@@ -12139,8 +12346,13 @@ function renderTable(){
       const typeIcon = c.type==='number'?'#':c.type==='date'?'D':'T';
       const isCalc = c._computed ? ' 🧮' : '';
       const sortClass = _tblSort.col===c.name ? (_tblSort.dir===1?'tbl-sort-asc':'tbl-sort-desc') : '';
-      return `<th class="${sortClass}" data-col="${esc(c.name)}" onclick="tblSortBy(this.dataset.col)">
-        ${esc(c.name)}${isCalc}<span class="th-type">${typeIcon}</span>
+      const filtered = tblFilterActive(c.name);
+      return `<th class="${sortClass}" data-col="${esc(c.name)}">
+        <span onclick="tblSortBy('${esc(c.name).replace(/'/g,"&#39;")}')" style="cursor:pointer">${esc(c.name)}${isCalc}</span>
+        <span class="th-type">${typeIcon}</span>
+        <span class="th-filter${filtered?' on':''}" role="button" tabindex="0"
+              title="Filtrer et changer le type"
+              onclick="event.stopPropagation();tblOpenColMenu('${esc(c.name).replace(/'/g,"&#39;")}',this)">▾</span>
       </th>`;
     }).join('') + '</tr>';
   }
@@ -12164,6 +12376,12 @@ function renderTable(){
   }
 
   // Pagination
+  const infoEl=document.getElementById('tbl-info');
+  if(infoEl){
+    const nf=tblFilterCount();
+    infoEl.textContent = rows.length.toLocaleString('fr-FR') + ' lignes · ' + columns.length + ' colonnes'
+      + (nf ? ' · ' + total.toLocaleString('fr-FR') + ' après ' + nf + ' filtre' + (nf>1?'s':'') : '');
+  }
   document.getElementById('tbl-page-info').textContent =
     `${(_tblPage*TBL_PAGE_SIZE+1).toLocaleString()}–${Math.min((_tblPage+1)*TBL_PAGE_SIZE,total).toLocaleString()} / ${total.toLocaleString()}`;
   document.getElementById('tbl-prev').disabled = _tblPage === 0;
@@ -13136,16 +13354,16 @@ function fpOpenSettings(instant){
 
 </script>
 <script type="module">
-import { renderBar } from './widgets/bar.js?v=bfa89e6';
-import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=bfa89e6';
-import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=bfa89e6';
-import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=bfa89e6';
-import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=bfa89e6';
-import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=bfa89e6';
-import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=bfa89e6';
-import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=bfa89e6';
-import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=bfa89e6';
-import { openWorkbook as fpOpenWorkbookStream, sheetToCsvBlob } from './widgets/xlsx-stream.js?v=bfa89e6';
+import { renderBar } from './widgets/bar.js?v=3c1a0aa';
+import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=3c1a0aa';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=3c1a0aa';
+import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=3c1a0aa';
+import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=3c1a0aa';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=3c1a0aa';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=3c1a0aa';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=3c1a0aa';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=3c1a0aa';
+import { openWorkbook as fpOpenWorkbookStream, sheetToCsvBlob } from './widgets/xlsx-stream.js?v=3c1a0aa';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
