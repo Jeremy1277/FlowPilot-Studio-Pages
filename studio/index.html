@@ -32,7 +32,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="fp-build" content="a8e5e14 · 20/08/2026 06:49 UTC"/>
+<meta name="fp-build" content="328e749 · 21/08/2026 07:15 UTC"/>
 <link rel="canonical" href="https://www.flwpilot.com/studio/"/>
 <script>
 /* Origine canonique. L'apex et le sous-domaine www sont deux origines
@@ -3623,9 +3623,22 @@ async function fpProcessWorkbook(buf, file){
       sheets=res.sheets;
       source={kind:'worker'};
     }catch(wErr){
-      // 2) repli : fil principal, avec pauses pour laisser respirer l'affichage
+      // 2) repli : fil principal, avec pauses pour laisser respirer l'affichage.
+      //
+      // Le tampon a été TRANSFÉRÉ au worker à l'étape 1, ce qui le détache
+      // côté fil principal : `new Uint8Array(buf)` levait « Cannot perform
+      // Construct on a detached ArrayBuffer ». Autrement dit, le repli prévu
+      // pour les cas où le worker échoue échouait lui aussi, systématiquement,
+      // et l'utilisateur se retrouvait devant un écran mort.
+      // On relit donc le fichier depuis le disque. Le transfert reste en place :
+      // il évite de dupliquer 30 Mo en mémoire dans le cas normal.
       await fpLoadYield();
-      const wb=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
+      let bytes = buf;
+      if(!bytes || bytes.byteLength === 0){
+        fpLoadUI(true,'Analyse du classeur','Relecture du fichier');
+        bytes = await file.arrayBuffer();
+      }
+      const wb=XLSX.read(new Uint8Array(bytes),{type:'array',cellDates:true});
       await fpLoadYield();
       sheets=wb.SheetNames.map(n=>{
         const ws=wb.Sheets[n];
@@ -12852,15 +12865,15 @@ function fpOpenSettings(instant){
 
 </script>
 <script type="module">
-import { renderBar } from './widgets/bar.js?v=a8e5e14';
-import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=a8e5e14';
-import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=a8e5e14';
-import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=a8e5e14';
-import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=a8e5e14';
-import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=a8e5e14';
-import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=a8e5e14';
-import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=a8e5e14';
-import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=a8e5e14';
+import { renderBar } from './widgets/bar.js?v=328e749';
+import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=328e749';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=328e749';
+import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=328e749';
+import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=328e749';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=328e749';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=328e749';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=328e749';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=328e749';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
