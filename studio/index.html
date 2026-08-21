@@ -32,7 +32,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="fp-build" content="32082b1 · 21/08/2026 10:02 UTC"/>
+<meta name="fp-build" content="bfa89e6 · 21/08/2026 10:40 UTC"/>
 <link rel="canonical" href="https://www.flwpilot.com/studio/"/>
 <script>
 /* Origine canonique. L'apex et le sous-domaine www sont deux origines
@@ -2334,7 +2334,7 @@ function fpToggleThemeMenu(ev){
       +'style="display:flex;align-items:center;gap:9px;width:100%;border:none;background:'+(t.id===cur?'var(--accent-soft)':'transparent')+';border-radius:8px;padding:8px 10px;cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--dark);text-align:left">'
       +'<span style="font-size:14px">'+t.icon+'</span>'+t.label
       +(t.id===cur?'<span style="margin-left:auto;color:var(--accent)">✓</span>':'')
-      +'</button>';
+      +'</'+tag+'>';
   }).join('');
   document.body.appendChild(menu);
   menu.addEventListener('click',function(e){
@@ -3654,6 +3654,8 @@ function xlsxWorkerCall(msg, expect, transfer){
 
 function handleFile(file){
   if(!file) return;
+  // Conservé pour la conversion CSV : celle-ci relit le fichier par flux.
+  window.__fpLastFile=file;
   window.__fpLastFileMeta={name:file.name, size:file.size,
     handle:window.__fpPendingHandle||null, url:window.__fpPendingUrl||null};
   window.__fpPendingHandle=null;
@@ -3780,6 +3782,54 @@ async function loadSheetFromSource(source, sheetInfo, fileName, showSheetInName)
 
 
 // Classeur multi-feuilles : choix de la feuille à analyser
+/** Convertit une feuille en CSV téléchargeable, sans jamais la charger en
+ *  entier. Réservé aux feuilles que le lecteur habituel ne peut pas ouvrir :
+ *  la limite de 512 Mo porte sur les chaînes de caractères, pas sur un fichier
+ *  assemblé par morceaux. */
+async function fpConvertSheetToCsv(sheetName, fileName){
+  const file = window.__fpLastFile;
+  if(!file){ toast('Fichier source indisponible — recharge-le'); return; }
+  if(typeof window.FP_openWorkbookStream !== 'function'){ toast('Module de conversion indisponible'); return; }
+
+  fpLoadUI(true, 'Conversion de « '+sheetName+' »', 'Lecture ligne par ligne');
+  fpLoadSetPct(2);
+  try{
+    const wb = await window.FP_openWorkbookStream(file);
+    const sheet = wb.sheets.find(s=>s.name===sheetName);
+    const total = sheet ? sheet.bytes : 0;
+    let lastPct = 2;
+
+    const res = await window.FP_sheetToCsvBlob(wb, sheetName, {
+      separator: ';',
+      onProgress: bytes => {
+        if(!total) return;
+        // On plafonne à 95 % : le 100 % appartient à l'écriture du fichier.
+        const pct = Math.min(95, 2 + (bytes/total)*93);
+        if(pct - lastPct >= 1){ lastPct = pct; fpLoadSetPct(pct); }
+      },
+      onRows: n => fpLoadUI(true, 'Conversion de « '+sheetName+' »',
+                            n.toLocaleString('fr-FR')+' lignes converties'),
+    });
+
+    fpLoadSetPct(100);
+    const base = String(fileName||'feuille').replace(/\.[^.]+$/,'');
+    const name = base+' - '+sheetName.replace(/[\\/:*?"<>|]/g,'_')+'.csv';
+    const url = URL.createObjectURL(res.blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    // Le navigateur a besoin du lien le temps d'amorcer le téléchargement.
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+
+    fpLoadUI(false);
+    toast(res.rows.toLocaleString('fr-FR')+' lignes converties — '
+          +Math.round(res.blob.size/1048576)+' Mo. Recharge ce CSV pour l\'analyser.');
+  }catch(err){
+    fpLoadUI(false);
+    toast('Conversion impossible : '+(err && err.message ? err.message : err));
+  }
+}
+
 function showSheetPicker(fileName,source,sheets){
   const prev=document.getElementById('sheet-picker-overlay');
   if(prev) prev.remove();
@@ -3794,7 +3844,8 @@ function showSheetPicker(fileName,source,sheets){
     const unreadable = sh.readable === false;
     const empty = !unreadable && sh.rows === 0;
     const headsTxt=sh.heads.length?sh.heads.slice(0,5).join(', ')+(sh.heads.length>5?'…':''):'';
-    return '<button type="button" class="fp-sheet-card" data-sheet="'+i+'" '+(empty||unreadable?'disabled':'')+' style="width:100%;text-align:left;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:'+(empty?'#f6f8fa':'linear-gradient(180deg,#ffffff,#f7fafd)')+';cursor:'+(empty?'default':'pointer')+';font-family:inherit;'+(empty?'opacity:.55;':'')+'box-shadow:0 1px 3px rgba(13,27,42,.07);transition:transform .12s ease,box-shadow .15s ease,border-color .12s ease">'
+    const tag = unreadable ? 'div' : 'button';
+    return '<'+tag+(unreadable?' data-unreadable="1"':' type="button"')+' class="fp-sheet-card" data-sheet="'+i+'" '+(empty?'disabled':'')+' style="width:100%;text-align:left;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:'+(empty?'#f6f8fa':'linear-gradient(180deg,#ffffff,#f7fafd)')+';cursor:'+(empty?'default':'pointer')+';font-family:inherit;'+(empty?'opacity:.55;':'')+'box-shadow:0 1px 3px rgba(13,27,42,.07);transition:transform .12s ease,box-shadow .15s ease,border-color .12s ease">'
       +'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
       +'<span style="font-weight:800;font-size:14px;color:var(--dark)">📄 '+esc(sh.name)+'</span>'
       +'<span style="font-size:11px;color:var(--muted);white-space:nowrap">'+(unreadable?'trop volumineuse':empty?'vide':sh.rows.toLocaleString('fr-FR')+' lignes · '+sh.cols+' col.')+'</span>'
@@ -3802,8 +3853,12 @@ function showSheetPicker(fileName,source,sheets){
       +(unreadable
         ? '<div style="font-size:11px;color:var(--coral);margin-top:5px;line-height:1.45">'
           +'Cette feuille dépasse ce qu\'un navigateur peut lire d\'un seul tenant (limite de 512 Mo de texte). '
-          +'Découpe-la en plusieurs onglets, ou exporte-la en CSV, qui n\'a pas cette limite.'
+          +'FlowPilot peut la convertir en CSV : la conversion se fait ligne par ligne, '
+          +'sans jamais charger la feuille en entier. Le fichier obtenu se recharge ici sans limite.'
           +'</div>'
+          +'<span role="button" tabindex="0" class="fp-csv-btn" data-csv="'+esc(sh.name)+'" '
+          +'style="display:inline-block;margin-top:8px;background:var(--navy);color:#fff;border-radius:9px;'
+          +'padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer">⬇ Convertir en CSV</span>'
         : headsTxt?'<div style="font-size:11px;color:var(--mid);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(headsTxt)+'</div>':'')
       +'</button>';
   }).join('');
@@ -3819,8 +3874,14 @@ function showSheetPicker(fileName,source,sheets){
   ov.addEventListener('click',e=>{
     // fermeture uniquement via la croix : un clic « à côté » n'annule plus le chargement
     if(e.target.id==='sheet-picker-close'){ov.remove();return;}
+    const csvBtn=e.target.closest('.fp-csv-btn');
+    if(csvBtn){
+      e.stopPropagation();
+      fpConvertSheetToCsv(csvBtn.dataset.csv, fileName);
+      return;
+    }
     const card=e.target.closest('.fp-sheet-card');
-    if(card&&!card.disabled){
+    if(card&&!card.disabled&&!card.dataset.unreadable){
       const sh=sheets[parseInt(card.dataset.sheet,10)];
       ov.remove();
       loadSheetFromSource(source,sh,fileName,true);
@@ -3828,7 +3889,7 @@ function showSheetPicker(fileName,source,sheets){
   });
   ov.addEventListener('mouseover',e=>{
     const card=e.target.closest('.fp-sheet-card');
-    if(card&&!card.disabled){card.style.transform='translateY(-1px)';card.style.borderColor='var(--accent)';card.style.boxShadow='0 4px 12px rgba(13,27,42,.14)';}
+    if(card&&!card.disabled&&!card.dataset.unreadable){card.style.transform='translateY(-1px)';card.style.borderColor='var(--accent)';card.style.boxShadow='0 4px 12px rgba(13,27,42,.14)';}
   });
   ov.addEventListener('mouseout',e=>{
     const card=e.target.closest('.fp-sheet-card');
@@ -13075,15 +13136,16 @@ function fpOpenSettings(instant){
 
 </script>
 <script type="module">
-import { renderBar } from './widgets/bar.js?v=32082b1';
-import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=32082b1';
-import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=32082b1';
-import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=32082b1';
-import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=32082b1';
-import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=32082b1';
-import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=32082b1';
-import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=32082b1';
-import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=32082b1';
+import { renderBar } from './widgets/bar.js?v=bfa89e6';
+import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=bfa89e6';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=bfa89e6';
+import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=bfa89e6';
+import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=bfa89e6';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=bfa89e6';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=bfa89e6';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=bfa89e6';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=bfa89e6';
+import { openWorkbook as fpOpenWorkbookStream, sheetToCsvBlob } from './widgets/xlsx-stream.js?v=bfa89e6';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
@@ -13095,6 +13157,8 @@ window.FP_keyToStart       = keyToStart;
 window.FP_periodLabel      = periodLabel;
 window.FP_TIME_COMPARE_MODES = TIME_COMPARE_MODES;
 window.FP_TIME_CUMUL_MODES   = TIME_CUMUL_MODES;
+window.FP_openWorkbookStream = fpOpenWorkbookStream;
+window.FP_sheetToCsvBlob     = sheetToCsvBlob;
 window.FP_suggestColumns   = suggestColumns;
 window.FP_OPERATIONS       = OPERATIONS;
 window.FP_buildOperation   = buildOperation;
