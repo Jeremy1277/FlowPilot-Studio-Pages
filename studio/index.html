@@ -32,7 +32,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="fp-build" content="44c515a · 21/08/2026 09:52 UTC"/>
+<meta name="fp-build" content="32082b1 · 21/08/2026 10:02 UTC"/>
 <link rel="canonical" href="https://www.flwpilot.com/studio/"/>
 <script>
 /* Origine canonique. L'apex et le sous-domaine www sont deux origines
@@ -3802,7 +3802,6 @@ function showSheetPicker(fileName,source,sheets){
       +(unreadable
         ? '<div style="font-size:11px;color:var(--coral);margin-top:5px;line-height:1.45">'
           +'Cette feuille dépasse ce qu\'un navigateur peut lire d\'un seul tenant (limite de 512 Mo de texte). '
-          +'Elle n\'est pas vide — son contenu ne peut simplement pas être chargé en entier. '
           +'Découpe-la en plusieurs onglets, ou exporte-la en CSV, qui n\'a pas cette limite.'
           +'</div>'
         : headsTxt?'<div style="font-size:11px;color:var(--mid);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(headsTxt)+'</div>':'')
@@ -13076,15 +13075,15 @@ function fpOpenSettings(instant){
 
 </script>
 <script type="module">
-import { renderBar } from './widgets/bar.js?v=44c515a';
-import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=44c515a';
-import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=44c515a';
-import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=44c515a';
-import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=44c515a';
-import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=44c515a';
-import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=44c515a';
-import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=44c515a';
-import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=44c515a';
+import { renderBar } from './widgets/bar.js?v=32082b1';
+import { renderDonut, renderDonutPanel, readDonutPanel } from './widgets/donut.js?v=32082b1';
+import { renderGeo, GEO_PALETTES, classifyGeoLabels } from './widgets/geo.js?v=32082b1';
+import { t, getLang, setLang, createLangSwitcher, applyI18n, I18N } from './widgets/i18n.js?v=32082b1';
+import { FONT_LIBRARY, loadFont, getFontFamily, buildFontPicker } from './widgets/fonts.js?v=32082b1';
+import { compile as compileFormula, FORMULA_FUNCTIONS, PROMPT_GRAMMAR, FORMULA_LIMITS } from './widgets/formula.js?v=32082b1';
+import { computeTimeIntel, periodKey, keyToStart, periodLabel, TIME_COMPARE_MODES, TIME_CUMUL_MODES } from './widgets/timeintel.js?v=32082b1';
+import { buildFlow, computeColumnStats, rankMeasures, rankDimensions, recommendWidget } from './widgets/recommend.js?v=32082b1';
+import { suggestColumns, previewFormula, OPERATIONS, buildOperation } from './widgets/suggest-columns.js?v=32082b1';
 window.FP_buildFlow          = buildFlow;
 window.FP_computeColumnStats = computeColumnStats;
 window.FP_rankMeasures       = rankMeasures;
